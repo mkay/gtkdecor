@@ -683,8 +683,8 @@ cairo_surface_t*decoration_theme_t::get_button_surface(button_type_t button,
     }
 
     // Draw circular button background - GTK style
-    // Always draw background, even if subtle
-    double radius = (state.width / 2.0) - 2.0;  // Slightly smaller than full size
+    // Larger circle so there's visible padding between icon and circle edge
+    double radius = (state.width / 2.0) - 2.5;
     cairo_arc(cr, state.width / 2, state.height / 2, radius, 0, 2 * M_PI);
     cairo_set_source_rgba(cr, bg_color.r, bg_color.g, bg_color.b, bg_color.a);
     cairo_fill(cr);
@@ -694,6 +694,19 @@ cairo_surface_t*decoration_theme_t::get_button_surface(button_type_t button,
     if (icon_color.r == 0.0 && icon_color.g == 0.0 && icon_color.b == 0.0)
     {
         icon_color = font_color;  // Fallback to config color
+    }
+
+    // Apply transparency based on hover state - semi-transparent by default, opaque on hover
+    if (state.hover_progress > 0)
+    {
+        // Hovered: full opacity white
+        icon_color.r = icon_color.g = icon_color.b = 1.0;
+        icon_color.a = 1.0;
+    }
+    else
+    {
+        // Default: semi-transparent
+        icon_color.a = 0.7;
     }
 
     // Try to load icon from theme
@@ -729,11 +742,14 @@ cairo_surface_t*decoration_theme_t::get_button_surface(button_type_t button,
                 state.width, state.height);
             cairo_t *icon_cr = cairo_create(icon_surface);
 
+            // Render SVG with padding inside the button circle
+            double icon_size = state.width * 0.83;  // Match GTK size with visible padding
+            double offset = (state.width - icon_size) / 2.0;
             RsvgRectangle viewport = {
-                .x = 0,
-                .y = 0,
-                .width = static_cast<double>(state.width),
-                .height = static_cast<double>(state.height)
+                .x = offset,
+                .y = offset,
+                .width = icon_size,
+                .height = icon_size
             };
 
             // Render SVG to temporary surface
@@ -760,25 +776,25 @@ cairo_surface_t*decoration_theme_t::get_button_surface(button_type_t button,
     // Fallback to drawing icons if loading failed
     if (!icon_loaded)
     {
-        cairo_set_line_width(cr, 1.5 * state.border);
+        cairo_set_line_width(cr, 1.0 * state.border);
         cairo_set_source_rgba(cr, icon_color.r, icon_color.g, icon_color.b, icon_color.a);
         cairo_set_line_cap(cr, CAIRO_LINE_CAP_ROUND);
 
         switch (button)
         {
           case BUTTON_CLOSE:
-            // X icon
-            cairo_move_to(cr, state.width * 0.3, state.height * 0.3);
-            cairo_line_to(cr, state.width * 0.7, state.height * 0.7);
-            cairo_move_to(cr, state.width * 0.7, state.height * 0.3);
-            cairo_line_to(cr, state.width * 0.3, state.height * 0.7);
+            // X icon - much smaller with substantial padding like GTK
+            cairo_move_to(cr, state.width * 0.49, state.height * 0.49);
+            cairo_line_to(cr, state.width * 0.51, state.height * 0.51);
+            cairo_move_to(cr, state.width * 0.51, state.height * 0.49);
+            cairo_line_to(cr, state.width * 0.49, state.height * 0.51);
             cairo_stroke(cr);
             break;
 
           case BUTTON_TOGGLE_MAXIMIZE:
-            // Square/window icon - clean square outline
+            // Square icon - much smaller with substantial padding like GTK
             {
-                double size = state.width * 0.4;
+                double size = state.width * 0.035;
                 double x = (state.width - size) / 2.0;
                 double y = (state.height - size) / 2.0;
                 cairo_rectangle(cr, x, y, size, size);
@@ -787,9 +803,9 @@ cairo_surface_t*decoration_theme_t::get_button_surface(button_type_t button,
             break;
 
           case BUTTON_MINIMIZE:
-            // Horizontal line icon
-            cairo_move_to(cr, state.width * 0.3, state.height * 0.5);
-            cairo_line_to(cr, state.width * 0.7, state.height * 0.5);
+            // Minus icon - much smaller with substantial padding like GTK
+            cairo_move_to(cr, state.width * 0.49, state.height * 0.5);
+            cairo_line_to(cr, state.width * 0.51, state.height * 0.5);
             cairo_stroke(cr);
             break;
 

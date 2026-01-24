@@ -75,15 +75,13 @@ void button_t::render(const scene::render_instruction_t& data, wf::geometry_t ge
 void button_t::update_texture()
 {
     /**
-     * We render at 100% resolution
-     * When uploading the texture, this gets scaled
-     * to 70% of the titlebar height. Thus we will have
-     * a very crisp image
+     * Render at 2x resolution for crisp display
+     * This prevents blurriness when rendered on screen
      */
     decoration_theme_t::button_state_t state = {
-        .width  = 1.0 * theme.get_title_height(),
-        .height = 1.0 * theme.get_title_height(),
-        .border = 1.0,
+        .width  = 2.0 * 0.64 * theme.get_title_height(),
+        .height = 2.0 * 0.64 * theme.get_title_height(),
+        .border = 2.0,
         .hover_progress = hover,
     };
 

@@ -6,7 +6,9 @@
 #include <wayfire/util.hpp>
 #include <sstream>
 
-#define BUTTON_HEIGHT_PC 0.7
+#define BUTTON_HEIGHT_PC 0.64
+#define BUTTON_HORIZONTAL_SPACING 5
+#define BUTTON_LEFT_MARGIN 8
 
 namespace wf
 {
@@ -94,9 +96,9 @@ wf::geometry_t decoration_layout_t::create_buttons(int width, int)
         }
     }
 
-    int per_button = 2 * button_padding + button_width;
+    int per_button = BUTTON_HORIZONTAL_SPACING + button_width;
     wf::geometry_t button_geometry = {
-        border_size + button_padding, /* Start from left side */
+        border_size + BUTTON_LEFT_MARGIN, /* Start from left side */
         button_padding + border_size,
         button_width,
         button_height,
@@ -110,10 +112,10 @@ wf::geometry_t decoration_layout_t::create_buttons(int width, int)
         button_geometry.x += per_button; /* Move to the right for next button */
     }
 
-    int total_width = -button_padding + buttons.size() * per_button;
+    int total_width = BUTTON_LEFT_MARGIN + buttons.size() * per_button;
 
     return {
-        border_size + button_padding, border_size,
+        border_size + BUTTON_LEFT_MARGIN, border_size,
         total_width, titlebar_size
     };
 }
