@@ -743,7 +743,7 @@ cairo_surface_t*decoration_theme_t::get_button_surface(button_type_t button,
             cairo_t *icon_cr = cairo_create(icon_surface);
 
             // Render SVG with padding inside the button circle
-            double icon_size = state.width * 0.83;  // Match GTK size with visible padding
+            double icon_size = state.width * 0.85;  // Match GTK size with visible padding
             double offset = (state.width - icon_size) / 2.0;
             RsvgRectangle viewport = {
                 .x = offset,
