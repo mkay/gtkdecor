@@ -23,6 +23,11 @@ class wayfire_gtkdecor : public wf::plugin_interface_t
     wf::view_matcher_t ignore_views{"gtkdecor/ignore_views"};
     wf::view_matcher_t forced_views{"gtkdecor/forced_views"};
 
+    // Config options for live reload
+    wf::option_wrapper_t<int> title_height{"gtkdecor/title_height"};
+    wf::option_wrapper_t<int> border_size{"gtkdecor/border_size"};
+    wf::option_wrapper_t<std::string> button_order{"gtkdecor/button_order"};
+
     // GTK settings file monitoring
     int inotify_fd = -1;
     int watch_fd = -1;
@@ -172,6 +177,13 @@ class wayfire_gtkdecor : public wf::plugin_interface_t
         }
     }
 
+    // Callback for config option changes
+    wf::config::option_base_t::updated_callback_t on_config_changed = [=] ()
+    {
+        LOGI("GTK decoration config changed, reloading decorations");
+        reload_all_decorations();
+    };
+
   public:
     void init() override
     {
@@ -179,6 +191,11 @@ class wayfire_gtkdecor : public wf::plugin_interface_t
         wf::get_core().connect(&on_decoration_state_changed);
         wf::get_core().tx_manager->connect(&on_new_tx);
         wf::get_core().connect(&on_view_tiled);
+
+        // Setup config change callbacks for live reload
+        title_height.set_callback(on_config_changed);
+        border_size.set_callback(on_config_changed);
+        button_order.set_callback(on_config_changed);
 
         for (auto& view : wf::get_core().get_all_views())
         {

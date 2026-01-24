@@ -211,7 +211,8 @@ std::string decoration_theme_t::find_icon_file(const std::string& icon_name, int
         {
             for (const auto& sub_dir : sub_dirs)
             {
-                // Try SVG first
+                // Try both possible directory orderings for maximum compatibility
+                // Pattern 1: theme/size/subdir/icon (e.g., Adwaita/symbolic/ui/icon.svg)
                 std::string path = base + "/" + icon_theme_name + "/" + size_dir + "/" + sub_dir + "/" + icon_name + ".svg";
                 struct stat buffer;
                 if (stat(path.c_str(), &buffer) == 0)
@@ -219,8 +220,21 @@ std::string decoration_theme_t::find_icon_file(const std::string& icon_name, int
                     return path;
                 }
 
-                // Try PNG
+                // Pattern 2: theme/subdir/size/icon (e.g., elementary/actions/symbolic/icon.svg)
+                path = base + "/" + icon_theme_name + "/" + sub_dir + "/" + size_dir + "/" + icon_name + ".svg";
+                if (stat(path.c_str(), &buffer) == 0)
+                {
+                    return path;
+                }
+
+                // Try PNG for both patterns
                 path = base + "/" + icon_theme_name + "/" + size_dir + "/" + sub_dir + "/" + icon_name + ".png";
+                if (stat(path.c_str(), &buffer) == 0)
+                {
+                    return path;
+                }
+
+                path = base + "/" + icon_theme_name + "/" + sub_dir + "/" + size_dir + "/" + icon_name + ".png";
                 if (stat(path.c_str(), &buffer) == 0)
                 {
                     return path;
@@ -369,7 +383,7 @@ void decoration_theme_t::load_gtk_theme() const
     icon_theme_name = get_icon_theme_name();
     LOGI("Found icon theme: ", icon_theme_name);
 
-    // Get font name from GTK settings
+    // Get font name from GTK settings - this should return "Open Sans 11"
     std::string gtk_font = get_gtk_font_name();
     if (!gtk_font.empty())
     {
@@ -383,8 +397,14 @@ void decoration_theme_t::load_gtk_theme() const
             } catch (...) {
                 theme_font_size = 11; // Default size
             }
-            LOGI("Found GTK font: ", theme_font_family, " ", theme_font_size);
         }
+    }
+
+    // If GTK font wasn't detected, use a reasonable default
+    if (theme_font_family.empty())
+    {
+        theme_font_family = "Sans";
+        theme_font_size = 10;
     }
 
     // Get theme name from GTK settings
@@ -592,37 +612,28 @@ cairo_surface_t*decoration_theme_t::render_text(std::string text,
     PangoFontDescription *font_desc;
     PangoLayout *layout;
 
-    // Prefer GTK theme font, fall back to config font
+    // Use detected GTK font (theme_font_family should always be set now)
     if (!theme_font_family.empty() && theme_font_size > 0)
     {
-        // Use theme font - titlebar fonts are typically smaller than UI fonts
-        font_desc = pango_font_description_new();
-        pango_font_description_set_family(font_desc, theme_font_family.c_str());
-        // Use 0.8x of the GTK font size for titlebar
-        pango_font_description_set_size(font_desc, (theme_font_size * 0.8) * PANGO_SCALE);
-        pango_font_description_set_weight(font_desc, PANGO_WEIGHT_NORMAL);
+        // Build the full font string and let Pango parse it
+        // This often works better than setting individual properties
+        std::string full_font_string = theme_font_family + " Bold " + std::to_string(theme_font_size);
+        font_desc = pango_font_description_from_string(full_font_string.c_str());
     }
     else if (!theme_font_family.empty())
     {
-        // Use theme font family with calculated size
-        font_desc = pango_font_description_new();
-        pango_font_description_set_family(font_desc, theme_font_family.c_str());
-        const float font_scale = 0.5; // Reduced from 0.9 for smaller text
-        const float font_size  = height * font_scale;
-        pango_font_description_set_absolute_size(font_desc, font_size * PANGO_SCALE);
+        std::string full_font_string = theme_font_family + " Bold 12";
+        font_desc = pango_font_description_from_string(full_font_string.c_str());
     }
     else
     {
-        // Parse font description from config (includes size)
-        font_desc = pango_font_description_from_string(((std::string)font).c_str());
-
-        // Only override size if not specified in font string
-        if (pango_font_description_get_size(font_desc) == 0)
+        // Fallback: parse from config or use default
+        std::string config_font = (std::string)font;
+        if (config_font.empty())
         {
-            const float font_scale = 0.5; // Reduced from 0.9 for smaller text
-            const float font_size  = height * font_scale;
-            pango_font_description_set_absolute_size(font_desc, font_size * PANGO_SCALE);
+            config_font = "Sans Bold 12";
         }
+        font_desc = pango_font_description_from_string(config_font.c_str());
     }
 
     layout = pango_cairo_create_layout(cr);
