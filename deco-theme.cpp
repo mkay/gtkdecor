@@ -383,8 +383,12 @@ void decoration_theme_t::load_gtk_theme() const
     icon_theme_name = get_icon_theme_name();
     LOGI("Found icon theme: ", icon_theme_name);
 
-    // Get font name from GTK settings - this should return "Open Sans 11"
+    // Get font name from GTK settings
     std::string gtk_font = get_gtk_font_name();
+    LOGI("GTK font from settings.ini: '", gtk_font, "'");
+
+    // Store whether we got font from GTK settings (to prevent CSS from overwriting it)
+    bool gtk_font_found = false;
     if (!gtk_font.empty())
     {
         // Parse font string (format: "Font Name Size")
@@ -394,17 +398,12 @@ void decoration_theme_t::load_gtk_theme() const
             theme_font_family = gtk_font.substr(0, last_space);
             try {
                 theme_font_size = std::stoi(gtk_font.substr(last_space + 1));
+                gtk_font_found = true;  // Successfully parsed GTK font
             } catch (...) {
                 theme_font_size = 11; // Default size
             }
+            LOGI("Parsed font family: '", theme_font_family, "', size: ", theme_font_size);
         }
-    }
-
-    // If GTK font wasn't detected, use a reasonable default
-    if (theme_font_family.empty())
-    {
-        theme_font_family = "Sans";
-        theme_font_size = 10;
     }
 
     // Get theme name from GTK settings
@@ -412,6 +411,12 @@ void decoration_theme_t::load_gtk_theme() const
     if (theme_name.empty())
     {
         LOGE("Could not determine GTK theme name, using fallback colors");
+        // Set default font if not found from GTK settings
+        if (!gtk_font_found)
+        {
+            theme_font_family = "Sans";
+            theme_font_size = 10;
+        }
         return;
     }
 
@@ -422,13 +427,36 @@ void decoration_theme_t::load_gtk_theme() const
     if (css_file.empty())
     {
         LOGE("Could not find CSS file for theme: ", theme_name);
+        // Set default font if not found from GTK settings
+        if (!gtk_font_found)
+        {
+            theme_font_family = "Sans";
+            theme_font_size = 10;
+        }
         return;
     }
 
     LOGI("Loading theme CSS from: ", css_file);
 
+    // Save GTK font before parsing CSS (CSS might overwrite it)
+    std::string saved_font_family = theme_font_family;
+    int saved_font_size = theme_font_size;
+
     // Parse the CSS file
     parse_theme_css(css_file);
+
+    // Restore GTK font if it was found (prioritize settings.ini over CSS)
+    if (gtk_font_found)
+    {
+        theme_font_family = saved_font_family;
+        theme_font_size = saved_font_size;
+    }
+    // Otherwise use CSS font if available, or default
+    else if (theme_font_family.empty())
+    {
+        theme_font_family = "Sans";
+        theme_font_size = 10;
+    }
 }
 
 /** Create a new theme with the default parameters */
@@ -514,6 +542,13 @@ void decoration_theme_t::render_background(const wf::scene::render_instruction_t
         bg_color = active ? active_color : inactive_color;
     }
 
+    // Use a lighter semi-transparent border to contrast with dark backgrounds (like native GTK)
+    wf::color_t outline_color;
+    outline_color.r = 1.0;
+    outline_color.g = 1.0;
+    outline_color.b = 1.0;
+    outline_color.a = 0.10;  // Subtle semi-transparent white border
+
     // Calculate titlebar area (top portion with rounded corners)
     int titlebar_h = title_height + border_size;
     wf::geometry_t titlebar_rect = {
@@ -521,9 +556,12 @@ void decoration_theme_t::render_background(const wf::scene::render_instruction_t
         rectangle.width, titlebar_h
     };
 
-    // Render titlebar with rounded top corners using Cairo
+    // Render titlebar with rounded top corners, drop shadow, and outline using Cairo
+    // Add extra space for the shadow
+    int shadow_offset = 2;
+    int shadow_blur = 3;
     auto titlebar_surface = cairo_image_surface_create(CAIRO_FORMAT_ARGB32,
-        titlebar_rect.width, titlebar_rect.height);
+        titlebar_rect.width + shadow_blur * 2, titlebar_rect.height + shadow_blur);
     auto cr = cairo_create(titlebar_surface);
 
     // Clear surface to transparent
@@ -532,56 +570,275 @@ void decoration_theme_t::render_background(const wf::scene::render_instruction_t
     cairo_set_operator(cr, CAIRO_OPERATOR_OVER);
 
     // Create rounded rectangle path (only top corners rounded)
+    // Offset by shadow_blur to leave room for shadow
     double radius = corner_radius;
-    double x = 0, y = 0;
+    double x = shadow_blur, y = shadow_blur;
     double w = titlebar_rect.width, h = titlebar_rect.height;
 
-    // Draw path: top-left corner -> top-right corner -> bottom-right -> bottom-left -> close
-    cairo_new_sub_path(cr);
-    cairo_arc(cr, x + radius, y + radius, radius, M_PI, 3 * M_PI / 2); // Top-left arc
-    cairo_arc(cr, x + w - radius, y + radius, radius, -M_PI / 2, 0);    // Top-right arc
-    cairo_line_to(cr, x + w, y + h);  // Line to bottom-right
-    cairo_line_to(cr, x, y + h);      // Line to bottom-left
-    cairo_close_path(cr);
+    // Helper lambda to draw the rounded rectangle path
+    auto draw_rounded_rect_path = [&]() {
+        cairo_new_sub_path(cr);
+        cairo_arc(cr, x + radius, y + radius, radius, M_PI, 3 * M_PI / 2); // Top-left arc
+        cairo_line_to(cr, x + w - radius, y);  // Line across the top
+        cairo_arc(cr, x + w - radius, y + radius, radius, -M_PI / 2, 0);    // Top-right arc
+        cairo_line_to(cr, x + w, y + h);  // Line to bottom-right
+        cairo_line_to(cr, x, y + h);      // Line to bottom-left
+        cairo_close_path(cr);
+    };
 
+    // Draw drop shadow - multiple passes with decreasing opacity for blur effect
+    for (int i = shadow_blur; i > 0; i--)
+    {
+        cairo_save(cr);
+        cairo_new_sub_path(cr);
+        double shadow_x = shadow_blur + 0.5;
+        double shadow_y = shadow_blur + shadow_offset + 0.5;
+        cairo_arc(cr, shadow_x + radius, shadow_y + radius, radius, M_PI, 3 * M_PI / 2);
+        cairo_line_to(cr, shadow_x + w - radius, shadow_y);  // Line across the top
+        cairo_arc(cr, shadow_x + w - radius, shadow_y + radius, radius, -M_PI / 2, 0);
+        cairo_line_to(cr, shadow_x + w, shadow_y + h);
+        cairo_line_to(cr, shadow_x, shadow_y + h);
+        cairo_close_path(cr);
+
+        double alpha = 0.1 * (1.0 - (double)i / shadow_blur);
+        cairo_set_source_rgba(cr, 0, 0, 0, alpha);
+        cairo_set_line_width(cr, i * 2.0);
+        cairo_stroke(cr);
+        cairo_restore(cr);
+    }
+
+    // Draw the filled background
+    draw_rounded_rect_path();
     cairo_set_source_rgba(cr, bg_color.r, bg_color.g, bg_color.b, bg_color.a);
-    cairo_fill(cr);
+    cairo_fill_preserve(cr);
+
+    // Draw the 1px border around the titlebar
+    cairo_set_source_rgba(cr, outline_color.r, outline_color.g, outline_color.b, outline_color.a);
+    cairo_set_line_width(cr, 1.0);
+    cairo_stroke(cr);
 
     cairo_destroy(cr);
 
-    // Convert to texture and render
+    // Convert to texture and render - adjust position for shadow offset
+    wf::geometry_t titlebar_with_shadow = {
+        titlebar_rect.x - shadow_blur,
+        titlebar_rect.y - shadow_blur,
+        titlebar_rect.width + shadow_blur * 2,
+        titlebar_rect.height + shadow_blur
+    };
     wf::owned_texture_t titlebar_tex{titlebar_surface};
-    data.pass->add_texture(titlebar_tex.get_texture(), data.target, titlebar_rect, data.damage);
+    data.pass->add_texture(titlebar_tex.get_texture(), data.target, titlebar_with_shadow, data.damage);
     cairo_surface_destroy(titlebar_surface);
 
-    // Render left border
+    // Render left border with outline and shadow (starts after rounded corner, stops before bottom corner)
     if (border_size > 0)
     {
+        int border_h = rectangle.height - corner_radius - border_size + 1;  // Stop just before bottom corner patch
+        auto left_surface = cairo_image_surface_create(CAIRO_FORMAT_ARGB32,
+            border_size + shadow_blur, border_h);
+        auto left_cr = cairo_create(left_surface);
+
+        // Clear to transparent
+        cairo_set_operator(left_cr, CAIRO_OPERATOR_CLEAR);
+        cairo_paint(left_cr);
+        cairo_set_operator(left_cr, CAIRO_OPERATOR_OVER);
+
+        // Draw shadow on left side
+        for (int i = shadow_blur; i > 0; i--)
+        {
+            double alpha = 0.1 * (1.0 - (double)i / shadow_blur);
+            cairo_set_source_rgba(left_cr, 0, 0, 0, alpha);
+            cairo_set_line_width(left_cr, i * 2.0);
+            cairo_move_to(left_cr, shadow_blur + 0.5, 0);
+            cairo_line_to(left_cr, shadow_blur + 0.5, border_h);
+            cairo_stroke(left_cr);
+        }
+
+        // Fill background
+        cairo_set_source_rgba(left_cr, bg_color.r, bg_color.g, bg_color.b, bg_color.a);
+        cairo_rectangle(left_cr, shadow_blur, 0, border_size, border_h);
+        cairo_fill(left_cr);
+
+        // Draw 1px border on left edge
+        cairo_set_source_rgba(left_cr, outline_color.r, outline_color.g, outline_color.b, outline_color.a);
+        cairo_set_line_width(left_cr, 1.0);
+        cairo_move_to(left_cr, shadow_blur + 0.5, 0);
+        cairo_line_to(left_cr, shadow_blur + 0.5, border_h);
+        cairo_stroke(left_cr);
+
+        cairo_destroy(left_cr);
+
         wf::geometry_t left_border = {
-            rectangle.x, rectangle.y + titlebar_h,
-            border_size, rectangle.height - titlebar_h
+            rectangle.x - shadow_blur, rectangle.y + corner_radius - 1,
+            border_size + shadow_blur, border_h
         };
-        data.pass->add_rect(bg_color, data.target, left_border, data.damage);
+        wf::owned_texture_t left_tex{left_surface};
+        data.pass->add_texture(left_tex.get_texture(), data.target, left_border, data.damage);
+        cairo_surface_destroy(left_surface);
     }
 
-    // Render right border
+    // Render right border with outline and shadow (starts after rounded corner, stops before bottom corner)
     if (border_size > 0)
     {
+        int border_h = rectangle.height - corner_radius - border_size + 1;  // Stop just before bottom corner patch
+        auto right_surface = cairo_image_surface_create(CAIRO_FORMAT_ARGB32,
+            border_size + shadow_blur, border_h);
+        auto right_cr = cairo_create(right_surface);
+
+        // Clear to transparent
+        cairo_set_operator(right_cr, CAIRO_OPERATOR_CLEAR);
+        cairo_paint(right_cr);
+        cairo_set_operator(right_cr, CAIRO_OPERATOR_OVER);
+
+        // Draw shadow on right side
+        for (int i = shadow_blur; i > 0; i--)
+        {
+            double alpha = 0.1 * (1.0 - (double)i / shadow_blur);
+            cairo_set_source_rgba(right_cr, 0, 0, 0, alpha);
+            cairo_set_line_width(right_cr, i * 2.0);
+            cairo_move_to(right_cr, border_size - 0.5, 0);
+            cairo_line_to(right_cr, border_size - 0.5, border_h);
+            cairo_stroke(right_cr);
+        }
+
+        // Fill background
+        cairo_set_source_rgba(right_cr, bg_color.r, bg_color.g, bg_color.b, bg_color.a);
+        cairo_rectangle(right_cr, 0, 0, border_size, border_h);
+        cairo_fill(right_cr);
+
+        // Draw 1px border on right edge
+        cairo_set_source_rgba(right_cr, outline_color.r, outline_color.g, outline_color.b, outline_color.a);
+        cairo_set_line_width(right_cr, 1.0);
+        cairo_move_to(right_cr, border_size - 0.5, 0);
+        cairo_line_to(right_cr, border_size - 0.5, border_h);
+        cairo_stroke(right_cr);
+
+        cairo_destroy(right_cr);
+
         wf::geometry_t right_border = {
-            rectangle.x + rectangle.width - border_size, rectangle.y + titlebar_h,
-            border_size, rectangle.height - titlebar_h
+            rectangle.x + rectangle.width - border_size, rectangle.y + corner_radius - 1,
+            border_size + shadow_blur, border_h
         };
-        data.pass->add_rect(bg_color, data.target, right_border, data.damage);
+        wf::owned_texture_t right_tex{right_surface};
+        data.pass->add_texture(right_tex.get_texture(), data.target, right_border, data.damage);
+        cairo_surface_destroy(right_surface);
     }
 
-    // Render bottom border
+    // Render bottom border with outline and shadow
     if (border_size > 0)
     {
+        auto bottom_surface = cairo_image_surface_create(CAIRO_FORMAT_ARGB32,
+            rectangle.width + shadow_blur * 2, border_size + shadow_blur);
+        auto bottom_cr = cairo_create(bottom_surface);
+
+        // Clear to transparent
+        cairo_set_operator(bottom_cr, CAIRO_OPERATOR_CLEAR);
+        cairo_paint(bottom_cr);
+        cairo_set_operator(bottom_cr, CAIRO_OPERATOR_OVER);
+
+        // Draw shadow on bottom (full width including corners)
+        for (int i = shadow_blur; i > 0; i--)
+        {
+            double alpha = 0.1 * (1.0 - (double)i / shadow_blur);
+            cairo_set_source_rgba(bottom_cr, 0, 0, 0, alpha);
+            cairo_set_line_width(bottom_cr, i * 2.0);
+            cairo_move_to(bottom_cr, 0, border_size + shadow_offset + 0.5);
+            cairo_line_to(bottom_cr, rectangle.width + shadow_blur * 2, border_size + shadow_offset + 0.5);
+            cairo_stroke(bottom_cr);
+        }
+
+        // Fill background (extend to cover corners with side borders)
+        cairo_set_source_rgba(bottom_cr, bg_color.r, bg_color.g, bg_color.b, bg_color.a);
+        cairo_rectangle(bottom_cr, 0, 0, rectangle.width + shadow_blur * 2, border_size);
+        cairo_fill(bottom_cr);
+
+        // Draw 1px border on bottom edge (full width to connect with side borders)
+        cairo_set_source_rgba(bottom_cr, outline_color.r, outline_color.g, outline_color.b, outline_color.a);
+        cairo_set_line_width(bottom_cr, 1.0);
+        cairo_move_to(bottom_cr, 0, border_size - 0.5);
+        cairo_line_to(bottom_cr, rectangle.width + shadow_blur * 2, border_size - 0.5);
+        cairo_stroke(bottom_cr);
+
+        cairo_destroy(bottom_cr);
+
         wf::geometry_t bottom_border = {
-            rectangle.x, rectangle.y + rectangle.height - border_size,
-            rectangle.width, border_size
+            rectangle.x - shadow_blur, rectangle.y + rectangle.height - border_size,
+            rectangle.width + shadow_blur * 2, border_size + shadow_blur
         };
-        data.pass->add_rect(bg_color, data.target, bottom_border, data.damage);
+        wf::owned_texture_t bottom_tex{bottom_surface};
+        data.pass->add_texture(bottom_tex.get_texture(), data.target, bottom_border, data.damage);
+        cairo_surface_destroy(bottom_surface);
+    }
+
+    // Render corner patches to fill any gaps at bottom-left and bottom-right
+    if (border_size > 0)
+    {
+        auto corner_surface = cairo_image_surface_create(CAIRO_FORMAT_ARGB32,
+            border_size, border_size);
+        auto corner_cr = cairo_create(corner_surface);
+
+        // Fill with background color
+        cairo_set_source_rgba(corner_cr, bg_color.r, bg_color.g, bg_color.b, bg_color.a);
+        cairo_paint(corner_cr);
+
+        // Draw borders on both edges
+        cairo_set_source_rgba(corner_cr, outline_color.r, outline_color.g, outline_color.b, outline_color.a);
+        cairo_set_line_width(corner_cr, 1.0);
+
+        // Left edge
+        cairo_move_to(corner_cr, 0.5, 0);
+        cairo_line_to(corner_cr, 0.5, border_size);
+        cairo_stroke(corner_cr);
+
+        // Bottom edge
+        cairo_move_to(corner_cr, 0, border_size - 0.5);
+        cairo_line_to(corner_cr, border_size, border_size - 0.5);
+        cairo_stroke(corner_cr);
+
+        cairo_destroy(corner_cr);
+
+        // Bottom-left corner (positioned to connect with side and bottom borders)
+        wf::geometry_t bottom_left_corner = {
+            rectangle.x + 1, rectangle.y + rectangle.height - border_size + 1,
+            border_size, border_size
+        };
+        wf::owned_texture_t corner_tex_left{corner_surface};
+        data.pass->add_texture(corner_tex_left.get_texture(), data.target, bottom_left_corner, data.damage);
+
+        // Bottom-right corner (need to mirror the border drawing)
+        auto corner_right_surface = cairo_image_surface_create(CAIRO_FORMAT_ARGB32,
+            border_size, border_size);
+        auto corner_right_cr = cairo_create(corner_right_surface);
+
+        // Fill with background color
+        cairo_set_source_rgba(corner_right_cr, bg_color.r, bg_color.g, bg_color.b, bg_color.a);
+        cairo_paint(corner_right_cr);
+
+        // Draw borders on both edges
+        cairo_set_source_rgba(corner_right_cr, outline_color.r, outline_color.g, outline_color.b, outline_color.a);
+        cairo_set_line_width(corner_right_cr, 1.0);
+
+        // Right edge
+        cairo_move_to(corner_right_cr, border_size - 0.5, 0);
+        cairo_line_to(corner_right_cr, border_size - 0.5, border_size);
+        cairo_stroke(corner_right_cr);
+
+        // Bottom edge
+        cairo_move_to(corner_right_cr, 0, border_size - 0.5);
+        cairo_line_to(corner_right_cr, border_size, border_size - 0.5);
+        cairo_stroke(corner_right_cr);
+
+        cairo_destroy(corner_right_cr);
+
+        wf::geometry_t bottom_right_corner = {
+            rectangle.x + rectangle.width - border_size - 1, rectangle.y + rectangle.height - border_size,
+            border_size, border_size
+        };
+        wf::owned_texture_t corner_tex_right{corner_right_surface};
+        data.pass->add_texture(corner_tex_right.get_texture(), data.target, bottom_right_corner, data.damage);
+
+        cairo_surface_destroy(corner_surface);
+        cairo_surface_destroy(corner_right_surface);
     }
 }
 
@@ -600,6 +857,9 @@ cairo_surface_t*decoration_theme_t::render_text(std::string text,
         return surface;
     }
 
+    // Lazy initialization: load GTK theme to get font settings
+    load_gtk_theme();
+
     wf::color_t color = theme_titlebar_fg_active;
     // Use config font color as fallback
     if (color.r == 0.0 && color.g == 0.0 && color.b == 0.0)
@@ -612,44 +872,65 @@ cairo_surface_t*decoration_theme_t::render_text(std::string text,
     PangoFontDescription *font_desc;
     PangoLayout *layout;
 
-    // Use detected GTK font (theme_font_family should always be set now)
-    if (!theme_font_family.empty() && theme_font_size > 0)
+    // Use GTK font with scaling to match native GTK titlebar size
+    std::string gtk_font_now = get_gtk_font_name();
+    std::string font_to_use;
+
+    if (!gtk_font_now.empty())
     {
-        // Build the full font string and let Pango parse it
-        // This often works better than setting individual properties
-        std::string full_font_string = theme_font_family + " Bold " + std::to_string(theme_font_size);
-        font_desc = pango_font_description_from_string(full_font_string.c_str());
-    }
-    else if (!theme_font_family.empty())
-    {
-        std::string full_font_string = theme_font_family + " Bold 12";
-        font_desc = pango_font_description_from_string(full_font_string.c_str());
+        // Parse the GTK font (format: "Font Name Weight Size")
+        size_t last_space = gtk_font_now.rfind(' ');
+        if (last_space != std::string::npos)
+        {
+            std::string font_family = gtk_font_now.substr(0, last_space);
+            std::string font_size_str = gtk_font_now.substr(last_space + 1);
+            try {
+                int base_size = std::stoi(font_size_str);
+                // Scale font size to match native GTK titlebar (typically 1.3-1.4x larger)
+                int scaled_size = static_cast<int>(base_size * 1.35);
+                font_to_use = font_family + " " + std::to_string(scaled_size);
+            } catch (...) {
+                font_to_use = gtk_font_now;  // Use as-is if parsing fails
+            }
+        }
+        else
+        {
+            font_to_use = gtk_font_now + " 11";
+        }
     }
     else
     {
-        // Fallback: parse from config or use default
-        std::string config_font = (std::string)font;
-        if (config_font.empty())
-        {
-            config_font = "Sans Bold 12";
-        }
-        font_desc = pango_font_description_from_string(config_font.c_str());
+        // Fallback if GTK font can't be read
+        font_to_use = "Sans 11";
     }
+
+    font_desc = pango_font_description_from_string(font_to_use.c_str());
 
     layout = pango_cairo_create_layout(cr);
     pango_layout_set_font_description(layout, font_desc);
     pango_layout_set_text(layout, text.c_str(), text.size());
 
-    // Center the text horizontally
+    // Reserve space for buttons on the left (approximately 140px for 3 buttons)
+    // and add padding on the right for symmetry
+    int left_padding = 140;  // Space for buttons
+    int right_padding = 50;  // Padding on right side
+    int text_width = width - left_padding - right_padding;
+    int text_x = left_padding;
+
+    // Center the text horizontally within the available space
     pango_layout_set_alignment(layout, PANGO_ALIGN_CENTER);
-    pango_layout_set_width(layout, width * PANGO_SCALE);
+    pango_layout_set_width(layout, text_width * PANGO_SCALE);
+
+    // Prevent wrapping and add ellipsis for long titles
+    pango_layout_set_ellipsize(layout, PANGO_ELLIPSIZE_END);
+    pango_layout_set_single_paragraph_mode(layout, TRUE);
 
     // Center vertically
     PangoRectangle ink_rect, logical_rect;
     pango_layout_get_pixel_extents(layout, &ink_rect, &logical_rect);
     int text_y = (height - logical_rect.height) / 2 - logical_rect.y;
 
-    cairo_move_to(cr, 0, text_y);
+    cairo_move_to(cr, text_x, text_y);
     cairo_set_source_rgba(cr, color.r, color.g, color.b, color.a);
     pango_cairo_show_layout(cr, layout);
 

@@ -128,7 +128,7 @@ void decoration_layout_t::resize(int width, int height)
     {
         auto button_geometry_expanded = create_buttons(width, height);
 
-        /* Title spans the full titlebar width for centered text rendering */
+        /* Title spans the full titlebar width (text padding handled in render_text) */
         wf::geometry_t title_geometry = {
             border_size,
             border_size,

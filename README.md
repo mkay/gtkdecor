@@ -16,8 +16,9 @@ A Wayfire plugin that provides server-side window decorations with native GTK3 t
 
 - **Font Integration**: Automatically uses your GTK font settings
   - Reads `gtk-font-name` from `~/.config/gtk-3.0/settings.ini`
-  - Proper font scaling for titlebar text
-  - Centered title text
+  - Font size scaled 1.35x to match native GTK titlebar size
+  - Centered title text with proper spacing around buttons
+  - Long titles truncated with ellipsis to prevent overflow
 
 - **Live Theme Reloading**: Automatically detects and reloads when you change:
   - GTK theme
@@ -69,15 +70,17 @@ forced_views = none
 
 1. **Theme Loading**: On first render, the plugin:
    - Reads your GTK settings from `~/.config/gtk-3.0/settings.ini`
-   - Loads the GTK theme CSS file
-   - Parses color definitions and font settings
+   - Extracts font family, weight, and size (e.g., "Source Sans 3 Semi-Bold 11")
+   - Loads the GTK theme CSS file for colors
+   - Font from settings.ini takes priority over CSS to ensure consistent rendering
    - Loads icon theme path
 
 2. **Rendering**: For each window:
    - Titlebar with rounded top corners using theme colors
    - Window control buttons with icon theme icons
    - Recolored SVG icons to match theme foreground
-   - Title text centered with theme font
+   - Title text centered with GTK font (scaled 1.35x for proper size)
+   - Long titles automatically truncated with ellipsis
 
 3. **Live Updates**: Uses inotify to monitor GTK settings file
    - Detects changes to `settings.ini`

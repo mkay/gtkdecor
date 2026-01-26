@@ -84,7 +84,7 @@ class decoration_theme_t
     wf::option_wrapper_t<wf::color_t> inactive_color{"gtkdecor/inactive_color"};
 
     // Rounded corner radius for titlebar
-    const int corner_radius = 8;
+    const int corner_radius = 12;
 
     // GTK theme parsing (mutable for lazy initialization)
     mutable bool theme_loaded;
