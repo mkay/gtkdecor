@@ -60,6 +60,8 @@ class decoration_theme_t
         /** Progress of button hover, in range [-1, 1].
          * Negative numbers are usually used for pressed state. */
         double hover_progress;
+        /** Whether the window is active/focused */
+        bool activated = true;
     };
 
     /**

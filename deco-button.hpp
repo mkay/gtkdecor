@@ -64,6 +64,12 @@ class button_t
     void set_pressed(bool is_pressed);
 
     /**
+     * Set whether the parent window is active/focused.
+     * Affects whether icons are visible.
+     */
+    void set_activated(bool is_activated);
+
+    /**
      * Render the button on the given framebuffer at the given coordinates.
      * Precondition: set_button_type() has been called, otherwise result is no-op
      *
@@ -83,6 +89,8 @@ class button_t
     bool is_hovered = false;
     /* Whether the button is currently being held */
     bool is_pressed = false;
+    /* Whether the parent window is active/focused */
+    bool is_activated = true;
     /* The shade of button background to use. */
     wf::animation::simple_animation_t hover{wf::create_option(100)};
 

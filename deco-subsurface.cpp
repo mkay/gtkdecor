@@ -132,6 +132,7 @@ class simple_decoration_node_t : public wf::scene::node_t, public wf::pointer_in
                 }
             } else // button
             {
+                item->as_button().set_activated(activated);
                 item->as_button().render(data, item->get_geometry() + origin);
             }
         }

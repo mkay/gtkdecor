@@ -63,6 +63,15 @@ void button_t::set_pressed(bool is_pressed)
     add_idle_damage();
 }
 
+void button_t::set_activated(bool activated)
+{
+    if (this->is_activated != activated)
+    {
+        this->is_activated = activated;
+        add_idle_damage();
+    }
+}
+
 void button_t::render(const scene::render_instruction_t& data, wf::geometry_t geometry)
 {
     data.pass->add_texture(button_texture.get_texture(), data.target, geometry, data.damage);
@@ -83,6 +92,7 @@ void button_t::update_texture()
         .height = 2.0 * 0.64 * theme.get_title_height(),
         .border = 2.0,
         .hover_progress = hover,
+        .activated = is_activated,
     };
 
     auto surface = theme.get_button_surface(type, state);

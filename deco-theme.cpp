@@ -981,130 +981,134 @@ cairo_surface_t*decoration_theme_t::get_button_surface(button_type_t button,
     cairo_set_source_rgba(cr, bg_color.r, bg_color.g, bg_color.b, bg_color.a);
     cairo_fill(cr);
 
-    // Use theme text color for icon, with fallback
-    wf::color_t icon_color = theme_titlebar_fg_active;
-    if (icon_color.r == 0.0 && icon_color.g == 0.0 && icon_color.b == 0.0)
+    // Only draw icon when window is active (like native GTK)
+    if (state.activated)
     {
-        icon_color = font_color;  // Fallback to config color
-    }
-
-    // Apply transparency based on hover state - semi-transparent by default, opaque on hover
-    if (state.hover_progress > 0)
-    {
-        // Hovered: full opacity white
-        icon_color.r = icon_color.g = icon_color.b = 1.0;
-        icon_color.a = 1.0;
-    }
-    else
-    {
-        // Default: semi-transparent
-        icon_color.a = 0.7;
-    }
-
-    // Try to load icon from theme
-    std::string icon_name;
-    switch (button)
-    {
-      case BUTTON_CLOSE:
-        icon_name = "window-close-symbolic";
-        break;
-      case BUTTON_TOGGLE_MAXIMIZE:
-        icon_name = "window-maximize-symbolic";
-        break;
-      case BUTTON_MINIMIZE:
-        icon_name = "window-minimize-symbolic";
-        break;
-      default:
-        break;
-    }
-
-    std::string icon_path = find_icon_file(icon_name, static_cast<int>(state.width));
-    bool icon_loaded = false;
-
-#ifdef HAVE_LIBRSVG
-    if (!icon_path.empty() && icon_path.find(".svg") != std::string::npos)
-    {
-        GError *error = NULL;
-        RsvgHandle *handle = rsvg_handle_new_from_file(icon_path.c_str(), &error);
-
-        if (handle)
+        // Use theme text color for icon, with fallback
+        wf::color_t icon_color = theme_titlebar_fg_active;
+        if (icon_color.r == 0.0 && icon_color.g == 0.0 && icon_color.b == 0.0)
         {
-            // Create temporary surface for the SVG
-            cairo_surface_t *icon_surface = cairo_image_surface_create(CAIRO_FORMAT_ARGB32,
-                state.width, state.height);
-            cairo_t *icon_cr = cairo_create(icon_surface);
-
-            // Render SVG with padding inside the button circle
-            double icon_size = state.width * 0.85;  // Match GTK size with visible padding
-            double offset = (state.width - icon_size) / 2.0;
-            RsvgRectangle viewport = {
-                .x = offset,
-                .y = offset,
-                .width = icon_size,
-                .height = icon_size
-            };
-
-            // Render SVG to temporary surface
-            if (rsvg_handle_render_document(handle, icon_cr, &viewport, &error))
-            {
-                // Use the SVG as a mask and paint with the icon color
-                cairo_set_source_rgba(cr, icon_color.r, icon_color.g, icon_color.b, icon_color.a);
-                cairo_mask_surface(cr, icon_surface, 0, 0);
-                icon_loaded = true;
-            }
-
-            cairo_destroy(icon_cr);
-            cairo_surface_destroy(icon_surface);
-            g_object_unref(handle);
+            icon_color = font_color;  // Fallback to config color
         }
 
-        if (error)
+        // Apply transparency based on hover state - semi-transparent by default, opaque on hover
+        if (state.hover_progress > 0)
         {
-            g_error_free(error);
+            // Hovered: full opacity white
+            icon_color.r = icon_color.g = icon_color.b = 1.0;
+            icon_color.a = 1.0;
         }
-    }
-#endif
+        else
+        {
+            // Default: semi-transparent
+            icon_color.a = 0.7;
+        }
 
-    // Fallback to drawing icons if loading failed
-    if (!icon_loaded)
-    {
-        cairo_set_line_width(cr, 1.0 * state.border);
-        cairo_set_source_rgba(cr, icon_color.r, icon_color.g, icon_color.b, icon_color.a);
-        cairo_set_line_cap(cr, CAIRO_LINE_CAP_ROUND);
-
+        // Try to load icon from theme
+        std::string icon_name;
         switch (button)
         {
           case BUTTON_CLOSE:
-            // X icon - much smaller with substantial padding like GTK
-            cairo_move_to(cr, state.width * 0.49, state.height * 0.49);
-            cairo_line_to(cr, state.width * 0.51, state.height * 0.51);
-            cairo_move_to(cr, state.width * 0.51, state.height * 0.49);
-            cairo_line_to(cr, state.width * 0.49, state.height * 0.51);
-            cairo_stroke(cr);
+            icon_name = "window-close-symbolic";
             break;
-
           case BUTTON_TOGGLE_MAXIMIZE:
-            // Square icon - much smaller with substantial padding like GTK
-            {
-                double size = state.width * 0.035;
-                double x = (state.width - size) / 2.0;
-                double y = (state.height - size) / 2.0;
-                cairo_rectangle(cr, x, y, size, size);
-                cairo_stroke(cr);
-            }
+            icon_name = "window-maximize-symbolic";
             break;
-
           case BUTTON_MINIMIZE:
-            // Minus icon - much smaller with substantial padding like GTK
-            cairo_move_to(cr, state.width * 0.49, state.height * 0.5);
-            cairo_line_to(cr, state.width * 0.51, state.height * 0.5);
-            cairo_stroke(cr);
+            icon_name = "window-minimize-symbolic";
             break;
-
           default:
-            assert(false);
+            break;
         }
-    }
+
+        std::string icon_path = find_icon_file(icon_name, static_cast<int>(state.width));
+        bool icon_loaded = false;
+
+#ifdef HAVE_LIBRSVG
+        if (!icon_path.empty() && icon_path.find(".svg") != std::string::npos)
+        {
+            GError *error = NULL;
+            RsvgHandle *handle = rsvg_handle_new_from_file(icon_path.c_str(), &error);
+
+            if (handle)
+            {
+                // Create temporary surface for the SVG
+                cairo_surface_t *icon_surface = cairo_image_surface_create(CAIRO_FORMAT_ARGB32,
+                    state.width, state.height);
+                cairo_t *icon_cr = cairo_create(icon_surface);
+
+                // Render SVG with padding inside the button circle
+                double icon_size = state.width * 0.85;  // Match GTK size with visible padding
+                double offset = (state.width - icon_size) / 2.0;
+                RsvgRectangle viewport = {
+                    .x = offset,
+                    .y = offset,
+                    .width = icon_size,
+                    .height = icon_size
+                };
+
+                // Render SVG to temporary surface
+                if (rsvg_handle_render_document(handle, icon_cr, &viewport, &error))
+                {
+                    // Use the SVG as a mask and paint with the icon color
+                    cairo_set_source_rgba(cr, icon_color.r, icon_color.g, icon_color.b, icon_color.a);
+                    cairo_mask_surface(cr, icon_surface, 0, 0);
+                    icon_loaded = true;
+                }
+
+                cairo_destroy(icon_cr);
+                cairo_surface_destroy(icon_surface);
+                g_object_unref(handle);
+            }
+
+            if (error)
+            {
+                g_error_free(error);
+            }
+        }
+#endif
+
+        // Fallback to drawing icons if loading failed
+        if (!icon_loaded)
+        {
+            cairo_set_line_width(cr, 1.0 * state.border);
+            cairo_set_source_rgba(cr, icon_color.r, icon_color.g, icon_color.b, icon_color.a);
+            cairo_set_line_cap(cr, CAIRO_LINE_CAP_ROUND);
+
+            switch (button)
+            {
+              case BUTTON_CLOSE:
+                // X icon - much smaller with substantial padding like GTK
+                cairo_move_to(cr, state.width * 0.49, state.height * 0.49);
+                cairo_line_to(cr, state.width * 0.51, state.height * 0.51);
+                cairo_move_to(cr, state.width * 0.51, state.height * 0.49);
+                cairo_line_to(cr, state.width * 0.49, state.height * 0.51);
+                cairo_stroke(cr);
+                break;
+
+              case BUTTON_TOGGLE_MAXIMIZE:
+                // Square icon - much smaller with substantial padding like GTK
+                {
+                    double size = state.width * 0.035;
+                    double x = (state.width - size) / 2.0;
+                    double y = (state.height - size) / 2.0;
+                    cairo_rectangle(cr, x, y, size, size);
+                    cairo_stroke(cr);
+                }
+                break;
+
+              case BUTTON_MINIMIZE:
+                // Minus icon - much smaller with substantial padding like GTK
+                cairo_move_to(cr, state.width * 0.49, state.height * 0.5);
+                cairo_line_to(cr, state.width * 0.51, state.height * 0.5);
+                cairo_stroke(cr);
+                break;
+
+              default:
+                assert(false);
+            }
+        }
+    } // end if (state.activated)
 
     cairo_destroy(cr);
     return button_surface;
