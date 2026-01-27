@@ -981,8 +981,8 @@ cairo_surface_t*decoration_theme_t::get_button_surface(button_type_t button,
     cairo_set_source_rgba(cr, bg_color.r, bg_color.g, bg_color.b, bg_color.a);
     cairo_fill(cr);
 
-    // Only draw icon when window is active (like native GTK)
-    if (state.activated)
+    // Draw icon when window is active or when button is hovered (like native GTK)
+    if (state.activated || state.hover_progress > 0)
     {
         // Use theme text color for icon, with fallback
         wf::color_t icon_color = theme_titlebar_fg_active;
