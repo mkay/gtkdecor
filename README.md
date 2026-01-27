@@ -79,7 +79,7 @@ forced_views = none
    - Titlebar with rounded top corners using theme colors
    - Window control buttons with icon theme icons
    - Recolored SVG icons to match theme foreground
-   - Title text centered with GTK font (scaled 1.35x for proper size)
+   - Title text centered with GTK font (scaled 1.12x for proper size)
    - Long titles automatically truncated with ellipsis
 
 3. **Live Updates**: Uses inotify to monitor GTK settings file
@@ -112,7 +112,7 @@ ninja plugins/gtkdecor/libgtkdecor.so
 ### Installing
 
 ```bash
-sudo cp build/plugins/gtkdecor/libgtkdecor.so /usr/local/lib/wayfire/
+sudo cp plugins/gtkdecor/libgtkdecor.so /usr/local/lib/wayfire/
 sudo cp metadata/gtkdecor.xml /usr/local/share/wayfire/metadata/
 ```
 
@@ -131,3 +131,7 @@ Based on the original Wayfire `decoration` plugin, extended with GTK3 theme inte
 ## License
 
 Same as Wayfire (MIT)
+
+## Disclaimer
+
+This project was created with the assistance of an AI agent. I do not have great expertise in C++, so the code has not really been reviewed. Anyone using or extending this project should independently verify its correctness, safety, and suitability for their use case. 

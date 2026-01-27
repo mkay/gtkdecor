@@ -887,8 +887,8 @@ cairo_surface_t*decoration_theme_t::render_text(std::string text,
             try {
                 int base_size = std::stoi(font_size_str);
                 // Scale font size to match native GTK titlebar (typically 1.3-1.4x larger)
-                int scaled_size = static_cast<int>(base_size * 1.35);
-                font_to_use = font_family + " " + std::to_string(scaled_size);
+                int scaled_size = static_cast<int>(base_size * 1.12);
+                font_to_use = font_family + " Bold " + std::to_string(scaled_size);
             } catch (...) {
                 font_to_use = gtk_font_now;  // Use as-is if parsing fails
             }
