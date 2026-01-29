@@ -1,6 +1,6 @@
 # GTK Decoration Plugin for Wayfire
 
-A Wayfire plugin that provides server-side window decorations with native GTK3 theme integration.
+A  [Wayfire](https://github.com/WayfireWM/wayfire) plugin that provides **server-side window decorations** (SSDs) with native GTK3 theme integration.
 
 ## Features
 
@@ -16,7 +16,7 @@ A Wayfire plugin that provides server-side window decorations with native GTK3 t
 
 - **Font Integration**: Automatically uses your GTK font settings
   - Reads `gtk-font-name` from `~/.config/gtk-3.0/settings.ini`
-  - Font size scaled 1.35x to match native GTK titlebar size
+  - Font size scaled 1.12x to match native GTK titlebar size
   - Centered title text with proper spacing around buttons
   - Long titles truncated with ellipsis to prevent overflow
 
@@ -135,3 +135,5 @@ Same as Wayfire (MIT)
 ## Disclaimer
 
 This project was created with the assistance of an AI agent. I do not have great expertise in C++, so the code has not really been reviewed. Anyone using or extending this project should independently verify its correctness, safety, and suitability for their use case. 
+## Screenshot
+![Screenshot of the plugin at work](assets/screenshot.png)
