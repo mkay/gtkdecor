@@ -113,6 +113,7 @@ wf::geometry_t decoration_layout_t::create_buttons(int width, int)
     }
 
     int total_width = BUTTON_LEFT_MARGIN + buttons.size() * per_button;
+    cached_button_area_width = border_size + total_width;
 
     return {
         border_size + BUTTON_LEFT_MARGIN, border_size,
@@ -362,6 +363,11 @@ void decoration_layout_t::update_cursor() const
     auto cursor_name = edges > 0 ?
         wlr_xcursor_get_resize_name((wlr_edges)edges) : "default";
     wf::get_core().set_cursor(cursor_name);
+}
+
+int decoration_layout_t::get_button_area_width() const
+{
+    return cached_button_area_width;
 }
 
 void decoration_layout_t::handle_focus_lost()

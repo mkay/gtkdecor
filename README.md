@@ -7,7 +7,7 @@ A  [Wayfire](https://github.com/WayfireWM/wayfire) plugin that provides **server
 - **Automatic GTK3 Theme Integration**: Decorations automatically match your GTK theme
   - Titlebar colors from your GTK theme
   - Window borders with proper styling
-  - Rounded top corners (8px radius)
+  - Rounded corners (12px top, 8px bottom)
 
 - **Icon Theme Support**: Window control buttons use icons from your icon theme
   - Icons are properly recolored to match theme foreground colors
@@ -61,10 +61,10 @@ forced_views = none
 
 ## Requirements
 
-- GTK 3.0 (`gtk+-3.0`)
+- Wayfire >= 0.10.1
 - Cairo
 - Pango
-- librsvg 2.0 (optional, for icon theme support)
+- librsvg 2.0 (optional, for SVG icon theme support)
 
 ## How It Works
 
@@ -76,11 +76,14 @@ forced_views = none
    - Loads icon theme path
 
 2. **Rendering**: For each window:
-   - Titlebar with rounded top corners using theme colors
+   - Titlebar with rounded top corners, bottom corners with subtle rounding
+   - Drop shadows on all edges
+   - Unified 1px contrast outline around the full decoration
    - Window control buttons with icon theme icons
    - Recolored SVG icons to match theme foreground
    - Title text centered with GTK font (scaled 1.12x for proper size)
    - Long titles automatically truncated with ellipsis
+   - Background surfaces cached and reused across frames (only regenerated on resize or focus change)
 
 3. **Live Updates**: Uses inotify to monitor GTK settings file
    - Detects changes to `settings.ini`
@@ -102,27 +105,26 @@ The original `decoration` plugin provides simple static decorations. `gtkdecor` 
 
 ### Building
 
-The plugin is built as part of the main Wayfire build:
-
 ```bash
-cd wayfire/build
-ninja plugins/gtkdecor/libgtkdecor.so
+meson setup builddir
+ninja -C builddir
 ```
 
 ### Installing
 
 ```bash
-sudo cp plugins/gtkdecor/libgtkdecor.so /usr/local/lib/wayfire/
-sudo cp metadata/gtkdecor.xml /usr/local/share/wayfire/metadata/
+sudo ninja -C builddir install
 ```
 
 ### File Structure
 
-- `decoration.cpp` - Main plugin logic, view matching, inotify monitoring
-- `deco-theme.cpp/hpp` - Theme parsing, GTK integration, rendering
-- `deco-layout.cpp/hpp` - Button layout and input handling
-- `deco-subsurface.cpp/hpp` - Scene graph integration
-- `deco-button.cpp/hpp` - Button rendering and state management
+- `src/decoration.cpp` - Main plugin logic, view matching, inotify monitoring
+- `src/deco-theme.cpp/hpp` - Theme parsing, GTK integration, rendering
+- `src/deco-layout.cpp/hpp` - Button layout and input handling
+- `src/deco-subsurface.cpp/hpp` - Scene graph integration
+- `src/deco-button.cpp/hpp` - Button rendering and state management
+- `metadata/gtkdecor.xml` - Plugin metadata for Wayfire
+- `icons/plugin-gtkdecor.svg` - Plugin icon for WCM
 
 ## Credits
 

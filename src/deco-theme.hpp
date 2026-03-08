@@ -3,6 +3,7 @@
 #include <wayfire/scene-render.hpp>
 #include "deco-button.hpp"
 #include <string>
+#include <memory>
 #include <map>
 
 namespace wf
@@ -46,8 +47,10 @@ class decoration_theme_t
     /**
      * Render the given text on a cairo_surface_t with the given size.
      * The caller is responsible for freeing the memory afterwards.
+     * @param button_area_width Width occupied by buttons on the left side
      */
-    cairo_surface_t *render_text(std::string text, int width, int height) const;
+    cairo_surface_t *render_text(std::string text, int width, int height,
+        int button_area_width = 0) const;
 
     struct button_state_t
     {
@@ -85,8 +88,9 @@ class decoration_theme_t
     wf::option_wrapper_t<wf::color_t> active_color{"gtkdecor/active_color"};
     wf::option_wrapper_t<wf::color_t> inactive_color{"gtkdecor/inactive_color"};
 
-    // Rounded corner radius for titlebar
-    const int corner_radius = 12;
+    // Rounded corner radii
+    const int corner_radius = 12;        // Top corners
+    const int bottom_corner_radius = 8;  // Bottom corners
 
     // GTK theme parsing (mutable for lazy initialization)
     mutable bool theme_loaded;
@@ -109,6 +113,30 @@ class decoration_theme_t
     std::string find_icon_file(const std::string& icon_name, int size) const;
     void parse_theme_css(const std::string& css_file) const;
     wf::color_t parse_css_color(const std::string& color_str) const;
+
+    // Background surface cache — avoids recreating Cairo surfaces every frame
+    mutable struct bg_cache_t
+    {
+        wf::geometry_t geometry{};
+        bool active = false;
+        bool valid = false;
+
+        std::unique_ptr<wf::owned_texture_t> titlebar_tex;
+        wf::geometry_t titlebar_rect{};
+
+        std::unique_ptr<wf::owned_texture_t> left_tex;
+        wf::geometry_t left_rect{};
+
+        std::unique_ptr<wf::owned_texture_t> right_tex;
+        wf::geometry_t right_rect{};
+
+        std::unique_ptr<wf::owned_texture_t> bottom_tex;
+        wf::geometry_t bottom_rect{};
+
+        std::unique_ptr<wf::owned_texture_t> outline_tex;
+        wf::geometry_t outline_rect{};
+    } bg_cache;
+    void invalidate_cache() const;
 };
 }
 }

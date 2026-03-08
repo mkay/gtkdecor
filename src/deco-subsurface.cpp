@@ -52,7 +52,8 @@ class simple_decoration_node_t : public wf::scene::node_t, public wf::pointer_in
             if ((title_texture.tex.get_size() != target_size) ||
                 (title_texture.current_text != view->get_title()))
             {
-                auto surface = theme.render_text(view->get_title(), target_size.width, target_size.height);
+                int btn_w = static_cast<int>(layout.get_button_area_width() * scale);
+                auto surface = theme.render_text(view->get_title(), target_size.width, target_size.height, btn_w);
                 title_texture.tex = wf::owned_texture_t{surface};
                 cairo_surface_destroy(surface);
                 title_texture.current_text = view->get_title();

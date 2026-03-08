@@ -1,7 +1,6 @@
 #include "deco-theme.hpp"
 #include <wayfire/core.hpp>
 #include <wayfire/opengl.hpp>
-#include <config.h>
 #include <fstream>
 #include <sstream>
 #include <regex>
@@ -485,6 +484,7 @@ decoration_theme_t::~decoration_theme_t()
 void decoration_theme_t::reload_theme() const
 {
     LOGI("Reloading GTK theme and icons");
+    invalidate_cache();
     theme_loaded = false;
     icon_theme_name.clear();
     theme_font_family.clear();
@@ -520,6 +520,11 @@ void decoration_theme_t::set_buttons(button_type_t flags)
     button_flags = flags;
 }
 
+void decoration_theme_t::invalidate_cache() const
+{
+    bg_cache.valid = false;
+}
+
 /**
  * Fill the given rectangle with the background color(s).
  *
@@ -532,6 +537,53 @@ void decoration_theme_t::render_background(const wf::scene::render_instruction_t
 {
     // Lazy initialization: load GTK theme on first render
     load_gtk_theme();
+
+    // Check if cached surfaces are still valid
+    bool cache_hit = bg_cache.valid &&
+        bg_cache.geometry.width == rectangle.width &&
+        bg_cache.geometry.height == rectangle.height &&
+        bg_cache.active == active;
+
+    if (cache_hit)
+    {
+        // Just re-submit cached textures
+        if (bg_cache.titlebar_tex)
+        {
+            data.pass->add_texture(bg_cache.titlebar_tex->get_texture(),
+                data.target, bg_cache.titlebar_rect + wf::point_t{rectangle.x, rectangle.y}
+                    - wf::point_t{bg_cache.geometry.x, bg_cache.geometry.y}, data.damage);
+        }
+        if (bg_cache.left_tex)
+        {
+            data.pass->add_texture(bg_cache.left_tex->get_texture(),
+                data.target, bg_cache.left_rect + wf::point_t{rectangle.x, rectangle.y}
+                    - wf::point_t{bg_cache.geometry.x, bg_cache.geometry.y}, data.damage);
+        }
+        if (bg_cache.right_tex)
+        {
+            data.pass->add_texture(bg_cache.right_tex->get_texture(),
+                data.target, bg_cache.right_rect + wf::point_t{rectangle.x, rectangle.y}
+                    - wf::point_t{bg_cache.geometry.x, bg_cache.geometry.y}, data.damage);
+        }
+        if (bg_cache.bottom_tex)
+        {
+            data.pass->add_texture(bg_cache.bottom_tex->get_texture(),
+                data.target, bg_cache.bottom_rect + wf::point_t{rectangle.x, rectangle.y}
+                    - wf::point_t{bg_cache.geometry.x, bg_cache.geometry.y}, data.damage);
+        }
+        if (bg_cache.outline_tex)
+        {
+            data.pass->add_texture(bg_cache.outline_tex->get_texture(),
+                data.target, bg_cache.outline_rect + wf::point_t{rectangle.x, rectangle.y}
+                    - wf::point_t{bg_cache.geometry.x, bg_cache.geometry.y}, data.damage);
+        }
+        return;
+    }
+
+    // Cache miss — regenerate all surfaces
+    bg_cache.geometry = rectangle;
+    bg_cache.active = active;
+    bg_cache.valid = true;
 
     // Use theme colors if available, otherwise fall back to config colors
     wf::color_t bg_color = active ? theme_titlebar_bg_active : theme_titlebar_bg_inactive;
@@ -556,94 +608,84 @@ void decoration_theme_t::render_background(const wf::scene::render_instruction_t
         rectangle.width, titlebar_h
     };
 
-    // Render titlebar with rounded top corners, drop shadow, and outline using Cairo
-    // Add extra space for the shadow
+    // Shadow parameters
     int shadow_offset = 2;
     int shadow_blur = 3;
-    auto titlebar_surface = cairo_image_surface_create(CAIRO_FORMAT_ARGB32,
-        titlebar_rect.width + shadow_blur * 2, titlebar_rect.height + shadow_blur);
-    auto cr = cairo_create(titlebar_surface);
 
-    // Clear surface to transparent
-    cairo_set_operator(cr, CAIRO_OPERATOR_CLEAR);
-    cairo_paint(cr);
-    cairo_set_operator(cr, CAIRO_OPERATOR_OVER);
-
-    // Create rounded rectangle path (only top corners rounded)
-    // Offset by shadow_blur to leave room for shadow
-    double radius = corner_radius;
-    double x = shadow_blur, y = shadow_blur;
-    double w = titlebar_rect.width, h = titlebar_rect.height;
-
-    // Helper lambda to draw the rounded rectangle path
-    auto draw_rounded_rect_path = [&]() {
-        cairo_new_sub_path(cr);
-        cairo_arc(cr, x + radius, y + radius, radius, M_PI, 3 * M_PI / 2); // Top-left arc
-        cairo_line_to(cr, x + w - radius, y);  // Line across the top
-        cairo_arc(cr, x + w - radius, y + radius, radius, -M_PI / 2, 0);    // Top-right arc
-        cairo_line_to(cr, x + w, y + h);  // Line to bottom-right
-        cairo_line_to(cr, x, y + h);      // Line to bottom-left
-        cairo_close_path(cr);
-    };
-
-    // Draw drop shadow - multiple passes with decreasing opacity for blur effect
-    for (int i = shadow_blur; i > 0; i--)
+    // --- Titlebar surface ---
     {
-        cairo_save(cr);
-        cairo_new_sub_path(cr);
-        double shadow_x = shadow_blur + 0.5;
-        double shadow_y = shadow_blur + shadow_offset + 0.5;
-        cairo_arc(cr, shadow_x + radius, shadow_y + radius, radius, M_PI, 3 * M_PI / 2);
-        cairo_line_to(cr, shadow_x + w - radius, shadow_y);  // Line across the top
-        cairo_arc(cr, shadow_x + w - radius, shadow_y + radius, radius, -M_PI / 2, 0);
-        cairo_line_to(cr, shadow_x + w, shadow_y + h);
-        cairo_line_to(cr, shadow_x, shadow_y + h);
-        cairo_close_path(cr);
+        auto titlebar_surface = cairo_image_surface_create(CAIRO_FORMAT_ARGB32,
+            titlebar_rect.width + shadow_blur * 2, titlebar_rect.height + shadow_blur);
+        auto cr = cairo_create(titlebar_surface);
 
-        double alpha = 0.1 * (1.0 - (double)i / shadow_blur);
-        cairo_set_source_rgba(cr, 0, 0, 0, alpha);
-        cairo_set_line_width(cr, i * 2.0);
-        cairo_stroke(cr);
-        cairo_restore(cr);
+        cairo_set_operator(cr, CAIRO_OPERATOR_CLEAR);
+        cairo_paint(cr);
+        cairo_set_operator(cr, CAIRO_OPERATOR_OVER);
+
+        double radius = corner_radius;
+        double x = shadow_blur, y = shadow_blur;
+        double w = titlebar_rect.width, h = titlebar_rect.height;
+
+        auto draw_rounded_rect_path = [&]() {
+            cairo_new_sub_path(cr);
+            cairo_arc(cr, x + radius, y + radius, radius, M_PI, 3 * M_PI / 2);
+            cairo_line_to(cr, x + w - radius, y);
+            cairo_arc(cr, x + w - radius, y + radius, radius, -M_PI / 2, 0);
+            cairo_line_to(cr, x + w, y + h);
+            cairo_line_to(cr, x, y + h);
+            cairo_close_path(cr);
+        };
+
+        // Drop shadow
+        for (int i = shadow_blur; i > 0; i--)
+        {
+            cairo_save(cr);
+            cairo_new_sub_path(cr);
+            double shadow_x = shadow_blur + 0.5;
+            double shadow_y = shadow_blur + shadow_offset + 0.5;
+            cairo_arc(cr, shadow_x + radius, shadow_y + radius, radius, M_PI, 3 * M_PI / 2);
+            cairo_line_to(cr, shadow_x + w - radius, shadow_y);
+            cairo_arc(cr, shadow_x + w - radius, shadow_y + radius, radius, -M_PI / 2, 0);
+            cairo_line_to(cr, shadow_x + w, shadow_y + h);
+            cairo_line_to(cr, shadow_x, shadow_y + h);
+            cairo_close_path(cr);
+
+            double alpha = 0.1 * (1.0 - (double)i / shadow_blur);
+            cairo_set_source_rgba(cr, 0, 0, 0, alpha);
+            cairo_set_line_width(cr, i * 2.0);
+            cairo_stroke(cr);
+            cairo_restore(cr);
+        }
+
+        draw_rounded_rect_path();
+        cairo_set_source_rgba(cr, bg_color.r, bg_color.g, bg_color.b, bg_color.a);
+        cairo_fill(cr);
+        cairo_destroy(cr);
+
+        bg_cache.titlebar_rect = {
+            titlebar_rect.x - shadow_blur,
+            titlebar_rect.y - shadow_blur,
+            titlebar_rect.width + shadow_blur * 2,
+            titlebar_rect.height + shadow_blur
+        };
+        bg_cache.titlebar_tex = std::make_unique<wf::owned_texture_t>(titlebar_surface);
+        data.pass->add_texture(bg_cache.titlebar_tex->get_texture(), data.target,
+            bg_cache.titlebar_rect, data.damage);
+        cairo_surface_destroy(titlebar_surface);
     }
 
-    // Draw the filled background
-    draw_rounded_rect_path();
-    cairo_set_source_rgba(cr, bg_color.r, bg_color.g, bg_color.b, bg_color.a);
-    cairo_fill_preserve(cr);
-
-    // Draw the 1px border around the titlebar
-    cairo_set_source_rgba(cr, outline_color.r, outline_color.g, outline_color.b, outline_color.a);
-    cairo_set_line_width(cr, 1.0);
-    cairo_stroke(cr);
-
-    cairo_destroy(cr);
-
-    // Convert to texture and render - adjust position for shadow offset
-    wf::geometry_t titlebar_with_shadow = {
-        titlebar_rect.x - shadow_blur,
-        titlebar_rect.y - shadow_blur,
-        titlebar_rect.width + shadow_blur * 2,
-        titlebar_rect.height + shadow_blur
-    };
-    wf::owned_texture_t titlebar_tex{titlebar_surface};
-    data.pass->add_texture(titlebar_tex.get_texture(), data.target, titlebar_with_shadow, data.damage);
-    cairo_surface_destroy(titlebar_surface);
-
-    // Render left border with outline and shadow (starts after rounded corner, stops before bottom corner)
+    // --- Left border ---
     if (border_size > 0)
     {
-        int border_h = rectangle.height - corner_radius - border_size + 1;  // Stop just before bottom corner patch
+        int border_h = rectangle.height - corner_radius - bottom_corner_radius + 1;
         auto left_surface = cairo_image_surface_create(CAIRO_FORMAT_ARGB32,
             border_size + shadow_blur, border_h);
         auto left_cr = cairo_create(left_surface);
 
-        // Clear to transparent
         cairo_set_operator(left_cr, CAIRO_OPERATOR_CLEAR);
         cairo_paint(left_cr);
         cairo_set_operator(left_cr, CAIRO_OPERATOR_OVER);
 
-        // Draw shadow on left side
         for (int i = shadow_blur; i > 0; i--)
         {
             double alpha = 0.1 * (1.0 - (double)i / shadow_blur);
@@ -654,43 +696,33 @@ void decoration_theme_t::render_background(const wf::scene::render_instruction_t
             cairo_stroke(left_cr);
         }
 
-        // Fill background
         cairo_set_source_rgba(left_cr, bg_color.r, bg_color.g, bg_color.b, bg_color.a);
         cairo_rectangle(left_cr, shadow_blur, 0, border_size, border_h);
         cairo_fill(left_cr);
-
-        // Draw 1px border on left edge
-        cairo_set_source_rgba(left_cr, outline_color.r, outline_color.g, outline_color.b, outline_color.a);
-        cairo_set_line_width(left_cr, 1.0);
-        cairo_move_to(left_cr, shadow_blur + 0.5, 0);
-        cairo_line_to(left_cr, shadow_blur + 0.5, border_h);
-        cairo_stroke(left_cr);
-
         cairo_destroy(left_cr);
 
-        wf::geometry_t left_border = {
+        bg_cache.left_rect = {
             rectangle.x - shadow_blur, rectangle.y + corner_radius - 1,
             border_size + shadow_blur, border_h
         };
-        wf::owned_texture_t left_tex{left_surface};
-        data.pass->add_texture(left_tex.get_texture(), data.target, left_border, data.damage);
+        bg_cache.left_tex = std::make_unique<wf::owned_texture_t>(left_surface);
+        data.pass->add_texture(bg_cache.left_tex->get_texture(), data.target,
+            bg_cache.left_rect, data.damage);
         cairo_surface_destroy(left_surface);
     }
 
-    // Render right border with outline and shadow (starts after rounded corner, stops before bottom corner)
+    // --- Right border ---
     if (border_size > 0)
     {
-        int border_h = rectangle.height - corner_radius - border_size + 1;  // Stop just before bottom corner patch
+        int border_h = rectangle.height - corner_radius - bottom_corner_radius + 1;
         auto right_surface = cairo_image_surface_create(CAIRO_FORMAT_ARGB32,
             border_size + shadow_blur, border_h);
         auto right_cr = cairo_create(right_surface);
 
-        // Clear to transparent
         cairo_set_operator(right_cr, CAIRO_OPERATOR_CLEAR);
         cairo_paint(right_cr);
         cairo_set_operator(right_cr, CAIRO_OPERATOR_OVER);
 
-        // Draw shadow on right side
         for (int i = shadow_blur; i > 0; i--)
         {
             double alpha = 0.1 * (1.0 - (double)i / shadow_blur);
@@ -701,144 +733,129 @@ void decoration_theme_t::render_background(const wf::scene::render_instruction_t
             cairo_stroke(right_cr);
         }
 
-        // Fill background
         cairo_set_source_rgba(right_cr, bg_color.r, bg_color.g, bg_color.b, bg_color.a);
         cairo_rectangle(right_cr, 0, 0, border_size, border_h);
         cairo_fill(right_cr);
-
-        // Draw 1px border on right edge
-        cairo_set_source_rgba(right_cr, outline_color.r, outline_color.g, outline_color.b, outline_color.a);
-        cairo_set_line_width(right_cr, 1.0);
-        cairo_move_to(right_cr, border_size - 0.5, 0);
-        cairo_line_to(right_cr, border_size - 0.5, border_h);
-        cairo_stroke(right_cr);
-
         cairo_destroy(right_cr);
 
-        wf::geometry_t right_border = {
+        bg_cache.right_rect = {
             rectangle.x + rectangle.width - border_size, rectangle.y + corner_radius - 1,
             border_size + shadow_blur, border_h
         };
-        wf::owned_texture_t right_tex{right_surface};
-        data.pass->add_texture(right_tex.get_texture(), data.target, right_border, data.damage);
+        bg_cache.right_tex = std::make_unique<wf::owned_texture_t>(right_surface);
+        data.pass->add_texture(bg_cache.right_tex->get_texture(), data.target,
+            bg_cache.right_rect, data.damage);
         cairo_surface_destroy(right_surface);
     }
 
-    // Render bottom border with outline and shadow
+    // --- Bottom border with rounded bottom corners ---
     if (border_size > 0)
     {
+        double br = bottom_corner_radius;
+        int bottom_h = border_size + (int)br;  // Extra height for corner arcs
+        int surface_w = rectangle.width + shadow_blur * 2;
+        int surface_h = bottom_h + shadow_blur;
         auto bottom_surface = cairo_image_surface_create(CAIRO_FORMAT_ARGB32,
-            rectangle.width + shadow_blur * 2, border_size + shadow_blur);
+            surface_w, surface_h);
         auto bottom_cr = cairo_create(bottom_surface);
 
-        // Clear to transparent
         cairo_set_operator(bottom_cr, CAIRO_OPERATOR_CLEAR);
         cairo_paint(bottom_cr);
         cairo_set_operator(bottom_cr, CAIRO_OPERATOR_OVER);
 
-        // Draw shadow on bottom (full width including corners)
+        // Draw shadow along the bottom with rounded corners
         for (int i = shadow_blur; i > 0; i--)
         {
             double alpha = 0.1 * (1.0 - (double)i / shadow_blur);
             cairo_set_source_rgba(bottom_cr, 0, 0, 0, alpha);
             cairo_set_line_width(bottom_cr, i * 2.0);
-            cairo_move_to(bottom_cr, 0, border_size + shadow_offset + 0.5);
-            cairo_line_to(bottom_cr, rectangle.width + shadow_blur * 2, border_size + shadow_offset + 0.5);
+
+            double sx = shadow_blur;
+            double sy = shadow_offset;
+            double sw = rectangle.width;
+
+            cairo_new_sub_path(bottom_cr);
+            cairo_move_to(bottom_cr, sx, sy + 0.5);
+            cairo_line_to(bottom_cr, sx + sw, sy + 0.5);
+            cairo_line_to(bottom_cr, sx + sw, sy + bottom_h - br + 0.5);
+            cairo_arc(bottom_cr, sx + sw - br, sy + bottom_h - br + 0.5, br, 0, M_PI / 2);
+            cairo_line_to(bottom_cr, sx + br, sy + bottom_h + 0.5);
+            cairo_arc(bottom_cr, sx + br, sy + bottom_h - br + 0.5, br, M_PI / 2, M_PI);
+            cairo_close_path(bottom_cr);
             cairo_stroke(bottom_cr);
         }
 
-        // Fill background (extend to cover corners with side borders)
+        // Fill bottom area with rounded bottom corners
+        double bx = shadow_blur;
+        double by = 0;
+        double bw = rectangle.width;
+
+        cairo_new_sub_path(bottom_cr);
+        cairo_move_to(bottom_cr, bx, by);
+        cairo_line_to(bottom_cr, bx + bw, by);
+        cairo_line_to(bottom_cr, bx + bw, by + bottom_h - br);
+        cairo_arc(bottom_cr, bx + bw - br, by + bottom_h - br, br, 0, M_PI / 2);
+        cairo_line_to(bottom_cr, bx + br, by + bottom_h);
+        cairo_arc(bottom_cr, bx + br, by + bottom_h - br, br, M_PI / 2, M_PI);
+        cairo_close_path(bottom_cr);
+
         cairo_set_source_rgba(bottom_cr, bg_color.r, bg_color.g, bg_color.b, bg_color.a);
-        cairo_rectangle(bottom_cr, 0, 0, rectangle.width + shadow_blur * 2, border_size);
         cairo_fill(bottom_cr);
-
-        // Draw 1px border on bottom edge (full width to connect with side borders)
-        cairo_set_source_rgba(bottom_cr, outline_color.r, outline_color.g, outline_color.b, outline_color.a);
-        cairo_set_line_width(bottom_cr, 1.0);
-        cairo_move_to(bottom_cr, 0, border_size - 0.5);
-        cairo_line_to(bottom_cr, rectangle.width + shadow_blur * 2, border_size - 0.5);
-        cairo_stroke(bottom_cr);
-
         cairo_destroy(bottom_cr);
 
-        wf::geometry_t bottom_border = {
-            rectangle.x - shadow_blur, rectangle.y + rectangle.height - border_size,
-            rectangle.width + shadow_blur * 2, border_size + shadow_blur
+        bg_cache.bottom_rect = {
+            rectangle.x - shadow_blur,
+            rectangle.y + rectangle.height - border_size - (int)br,
+            surface_w, surface_h
         };
-        wf::owned_texture_t bottom_tex{bottom_surface};
-        data.pass->add_texture(bottom_tex.get_texture(), data.target, bottom_border, data.damage);
+        bg_cache.bottom_tex = std::make_unique<wf::owned_texture_t>(bottom_surface);
+        data.pass->add_texture(bg_cache.bottom_tex->get_texture(), data.target,
+            bg_cache.bottom_rect, data.damage);
         cairo_surface_destroy(bottom_surface);
     }
 
-    // Render corner patches to fill any gaps at bottom-left and bottom-right
-    if (border_size > 0)
+    // --- Unified outline: rounded top corners, rounded bottom corners ---
     {
-        auto corner_surface = cairo_image_surface_create(CAIRO_FORMAT_ARGB32,
-            border_size, border_size);
-        auto corner_cr = cairo_create(corner_surface);
+        auto outline_surface = cairo_image_surface_create(CAIRO_FORMAT_ARGB32,
+            rectangle.width, rectangle.height);
+        auto outline_cr = cairo_create(outline_surface);
 
-        // Fill with background color
-        cairo_set_source_rgba(corner_cr, bg_color.r, bg_color.g, bg_color.b, bg_color.a);
-        cairo_paint(corner_cr);
+        cairo_set_operator(outline_cr, CAIRO_OPERATOR_CLEAR);
+        cairo_paint(outline_cr);
+        cairo_set_operator(outline_cr, CAIRO_OPERATOR_OVER);
 
-        // Draw borders on both edges
-        cairo_set_source_rgba(corner_cr, outline_color.r, outline_color.g, outline_color.b, outline_color.a);
-        cairo_set_line_width(corner_cr, 1.0);
+        double r = corner_radius;
+        double br = bottom_corner_radius;
+        double w = rectangle.width;
+        double h = rectangle.height;
 
-        // Left edge
-        cairo_move_to(corner_cr, 0.5, 0);
-        cairo_line_to(corner_cr, 0.5, border_size);
-        cairo_stroke(corner_cr);
+        cairo_new_sub_path(outline_cr);
+        // Top-left arc
+        cairo_arc(outline_cr, 0.5 + r, 0.5 + r, r, M_PI, 3 * M_PI / 2);
+        // Top-right arc
+        cairo_arc(outline_cr, w - 0.5 - r, 0.5 + r, r, -M_PI / 2, 0);
+        // Down to bottom-right arc
+        cairo_line_to(outline_cr, w - 0.5, h - 0.5 - br);
+        cairo_arc(outline_cr, w - 0.5 - br, h - 0.5 - br, br, 0, M_PI / 2);
+        // Across bottom to bottom-left arc
+        cairo_arc(outline_cr, 0.5 + br, h - 0.5 - br, br, M_PI / 2, M_PI);
+        // Close path (up left side)
+        cairo_close_path(outline_cr);
 
-        // Bottom edge
-        cairo_move_to(corner_cr, 0, border_size - 0.5);
-        cairo_line_to(corner_cr, border_size, border_size - 0.5);
-        cairo_stroke(corner_cr);
+        cairo_set_source_rgba(outline_cr, outline_color.r, outline_color.g,
+            outline_color.b, outline_color.a);
+        cairo_set_line_width(outline_cr, 1.0);
+        cairo_stroke(outline_cr);
+        cairo_destroy(outline_cr);
 
-        cairo_destroy(corner_cr);
-
-        // Bottom-left corner (positioned to connect with side and bottom borders)
-        wf::geometry_t bottom_left_corner = {
-            rectangle.x + 1, rectangle.y + rectangle.height - border_size + 1,
-            border_size, border_size
+        bg_cache.outline_rect = {
+            rectangle.x, rectangle.y,
+            rectangle.width, rectangle.height
         };
-        wf::owned_texture_t corner_tex_left{corner_surface};
-        data.pass->add_texture(corner_tex_left.get_texture(), data.target, bottom_left_corner, data.damage);
-
-        // Bottom-right corner (need to mirror the border drawing)
-        auto corner_right_surface = cairo_image_surface_create(CAIRO_FORMAT_ARGB32,
-            border_size, border_size);
-        auto corner_right_cr = cairo_create(corner_right_surface);
-
-        // Fill with background color
-        cairo_set_source_rgba(corner_right_cr, bg_color.r, bg_color.g, bg_color.b, bg_color.a);
-        cairo_paint(corner_right_cr);
-
-        // Draw borders on both edges
-        cairo_set_source_rgba(corner_right_cr, outline_color.r, outline_color.g, outline_color.b, outline_color.a);
-        cairo_set_line_width(corner_right_cr, 1.0);
-
-        // Right edge
-        cairo_move_to(corner_right_cr, border_size - 0.5, 0);
-        cairo_line_to(corner_right_cr, border_size - 0.5, border_size);
-        cairo_stroke(corner_right_cr);
-
-        // Bottom edge
-        cairo_move_to(corner_right_cr, 0, border_size - 0.5);
-        cairo_line_to(corner_right_cr, border_size, border_size - 0.5);
-        cairo_stroke(corner_right_cr);
-
-        cairo_destroy(corner_right_cr);
-
-        wf::geometry_t bottom_right_corner = {
-            rectangle.x + rectangle.width - border_size - 1, rectangle.y + rectangle.height - border_size,
-            border_size, border_size
-        };
-        wf::owned_texture_t corner_tex_right{corner_right_surface};
-        data.pass->add_texture(corner_tex_right.get_texture(), data.target, bottom_right_corner, data.damage);
-
-        cairo_surface_destroy(corner_surface);
-        cairo_surface_destroy(corner_right_surface);
+        bg_cache.outline_tex = std::make_unique<wf::owned_texture_t>(outline_surface);
+        data.pass->add_texture(bg_cache.outline_tex->get_texture(), data.target,
+            bg_cache.outline_rect, data.damage);
+        cairo_surface_destroy(outline_surface);
     }
 }
 
@@ -847,7 +864,7 @@ void decoration_theme_t::render_background(const wf::scene::render_instruction_t
  * The caller is responsible for freeing the memory afterwards.
  */
 cairo_surface_t*decoration_theme_t::render_text(std::string text,
-    int width, int height) const
+    int width, int height, int button_area_width) const
 {
     const auto format = CAIRO_FORMAT_ARGB32;
     auto surface = cairo_image_surface_create(format, width, height);
@@ -910,11 +927,11 @@ cairo_surface_t*decoration_theme_t::render_text(std::string text,
     pango_layout_set_font_description(layout, font_desc);
     pango_layout_set_text(layout, text.c_str(), text.size());
 
-    // Reserve space for buttons on the left (approximately 140px for 3 buttons)
-    // and add padding on the right for symmetry
-    int left_padding = 140;  // Space for buttons
-    int right_padding = 50;  // Padding on right side
+    // Reserve space for buttons on the left and mirror on the right for centering
+    int left_padding = (button_area_width > 0) ? button_area_width : 10;
+    int right_padding = left_padding;  // Mirror for true visual centering
     int text_width = width - left_padding - right_padding;
+    if (text_width < 0) text_width = width;  // Fallback if window too narrow
     int text_x = left_padding;
 
     // Center the text horizontally within the available space

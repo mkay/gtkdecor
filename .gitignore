@@ -1,0 +1,8 @@
+builddir/
+build/
+*.so
+*.pkg.tar.zst
+*.deb
+deb-staging/
+pkg/
+src/*.o

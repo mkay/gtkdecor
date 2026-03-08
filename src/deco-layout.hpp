@@ -137,6 +137,10 @@ class decoration_layout_t
      */
     void handle_focus_lost();
 
+    /** @return The width of the button area (for title text centering) */
+    int get_button_area_width() const;
+
+
   private:
     const int titlebar_size;
     const int border_size;
@@ -147,6 +151,7 @@ class decoration_layout_t
 
     std::function<void(wlr_box)> damage_callback;
 
+    int cached_button_area_width = 0;
     std::vector<std::unique_ptr<decoration_area_t>> layout_areas;
 
     bool is_grabbed = false;

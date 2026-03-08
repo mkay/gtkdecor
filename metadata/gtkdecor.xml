@@ -1,0 +1,58 @@
+<?xml version="1.0"?>
+<wayfire>
+	<plugin name="gtkdecor">
+		<_short>GTK Decoration</_short>
+		<_long>Server-side window decorations with native GTK3 theme integration. Automatically matches your GTK theme, icon theme, and fonts.</_long>
+		<category>Desktop</category>
+		<option name="font" type="string">
+			<_short>Fallback Font</_short>
+			<_long>Fallback font if GTK theme font cannot be determined. Normally uses your GTK font automatically.</_long>
+			<default>sans-serif</default>
+		</option>
+		<option name="font_color" type="color">
+			<_short>Fallback Font color</_short>
+			<_long>Fallback font color if GTK theme color cannot be determined. Normally uses your GTK theme color automatically.</_long>
+			<default>#ffffffff</default>
+		</option>
+		<option name="title_height" type="int">
+			<_short>Title bar height</_short>
+			<_long>Sets the height of the title bars in pixels.</_long>
+			<default>28</default>
+			<max>100</max>
+			<min>0</min>
+		</option>
+		<option name="border_size" type="int">
+			<_short>Border size</_short>
+			<_long>Sets the border size in pixels.</_long>
+			<default>4</default>
+			<max>100</max>
+			<min>0</min>
+		</option>
+		<option name="button_order" type="string">
+			<_short>Order of window buttons</_short>
+			<_long>Sets the order of the window buttons (from left to right).</_long>
+			<default>close minimize maximize</default>
+		</option>
+		<!-- Fallback Colors (used if GTK theme cannot be loaded) -->
+		<option name="active_color" type="color">
+			<_short>Fallback color when window is active</_short>
+			<_long>Fallback color when window is active. Normally uses your GTK theme color automatically.</_long>
+			<default>#222222aa</default>
+		</option>
+		<option name="inactive_color" type="color">
+			<_short>Fallback color when window is inactive</_short>
+			<_long>Fallback color when window is inactive. Normally uses your GTK theme color automatically.</_long>
+			<default>#333333dd</default>
+		</option>
+		<option name="ignore_views" type="string">
+			<_short>Decoration disabled for specified window types</_short>
+			<_long>Disables window decoration for windows matching the specified criteria.</_long>
+			<default>none</default>
+		</option>
+		<option name="forced_views" type="string">
+			<_short>Force decorations for specified window types</_short>
+			<_long>Forces window decoration for windows matching the specified criteria, overriding client decoration preference.</_long>
+			<default>none</default>
+		</option>
+	</plugin>
+</wayfire>
