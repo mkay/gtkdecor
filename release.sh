@@ -57,63 +57,9 @@ echo "==> Building Arch package"
 makepkg -sf --noconfirm
 ARCH_PKG=$(ls -t *.pkg.tar.zst 2>/dev/null | grep -v debug | head -1)
 
-# 5. Build .deb package via meson install + nfpm
-echo "==> Building .deb package"
-PKGDESC=$(grep -oP "^pkgdesc=\"\K[^\"]+" PKGBUILD || echo "$PROJECT_NAME")
-PKGLICENSE=$(grep -oP "^license=\('\K[^']+" PKGBUILD || echo "MIT")
-
-# Parse runtime dependencies from PKGBUILD and map to Debian package names
-ARCH_DEPS=$(sed -n '/^depends=(/,/)/p' PKGBUILD | grep -oP "'[^']+" | tr -d "'" || true)
-DEB_DEPS=""
-declare -A ARCH_TO_DEB=(
-    [wayfire]="wayfire"
-    [cairo]="libcairo2"
-    [pango]="libpango-1.0-0"
-    [librsvg]="librsvg2-2"
-)
-for dep in $ARCH_DEPS; do
-    deb_name="${ARCH_TO_DEB[$dep]:-$dep}"
-    DEB_DEPS+="  - $deb_name
-"
-done
-
-# Install into a staging directory to capture all files
-DEB_STAGING="$(pwd)/deb-staging"
-rm -rf "$DEB_STAGING"
-meson setup builddir --prefix=/usr --wipe
-meson compile -C builddir
-DESTDIR="$DEB_STAGING" meson install -C builddir --no-rebuild
-
-# Generate nfpm contents from the staged install tree
-CONTENTS=""
-while IFS= read -r file; do
-    dst="${file#"$DEB_STAGING"}"
-    CONTENTS+="  - src: $file
-    dst: $dst
-"
-done < <(find "$DEB_STAGING" -type f)
-
-cat > /tmp/nfpm-release.yaml <<NFPM
-name: $PROJECT_NAME
-arch: amd64
-version: $VERSION
-maintainer: mk
-description: $PKGDESC
-license: $PKGLICENSE
-depends:
-$DEB_DEPS
-contents:
-$CONTENTS
-NFPM
-
-VERSION="$VERSION" nfpm package -p deb -f /tmp/nfpm-release.yaml
-rm -rf "$DEB_STAGING"
-DEB_PKG=$(ls -t "${PROJECT_NAME}"*.deb 2>/dev/null | head -1)
-
-# 6. Create releases
+# 5. Create releases
 RELEASE_ASSETS=()
 [[ -n "${ARCH_PKG:-}" ]] && RELEASE_ASSETS+=("$ARCH_PKG")
-[[ -n "${DEB_PKG:-}" ]] && RELEASE_ASSETS+=("$DEB_PKG")
 
 # GitHub release — find the github remote by URL
 GITHUB_REMOTE=""
