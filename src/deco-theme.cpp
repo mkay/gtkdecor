@@ -74,6 +74,7 @@ std::string decoration_theme_t::get_gtk_theme_name() const
     std::string line;
     while (std::getline(settings_file, line))
     {
+        // cppcheck-suppress stlIfStrFind
         if (line.find("gtk-theme-name=") == 0)
         {
             return line.substr(15);  // Length of "gtk-theme-name="
@@ -102,6 +103,7 @@ std::string decoration_theme_t::get_icon_theme_name() const
     std::string line;
     while (std::getline(settings_file, line))
     {
+        // cppcheck-suppress stlIfStrFind
         if (line.find("gtk-icon-theme-name=") == 0)
         {
             return line.substr(20);  // Length of "gtk-icon-theme-name="
@@ -130,6 +132,7 @@ std::string decoration_theme_t::get_gtk_font_name() const
     std::string line;
     while (std::getline(settings_file, line))
     {
+        // cppcheck-suppress stlIfStrFind
         if (line.find("gtk-font-name=") == 0)
         {
             return line.substr(14);  // Length of "gtk-font-name="
@@ -460,6 +463,7 @@ void decoration_theme_t::load_gtk_theme() const
 
 /** Create a new theme with the default parameters */
 decoration_theme_t::decoration_theme_t() :
+    button_flags{},
     theme_loaded(false),
     theme_titlebar_bg_active{0.1, 0.1, 0.15, 1.0},
     theme_titlebar_bg_inactive{0.15, 0.15, 0.2, 1.0},
@@ -861,7 +865,7 @@ void decoration_theme_t::render_background(const wf::scene::render_instruction_t
  * Render the given text on a cairo_surface_t with the given size.
  * The caller is responsible for freeing the memory afterwards.
  */
-cairo_surface_t*decoration_theme_t::render_text(std::string text,
+cairo_surface_t*decoration_theme_t::render_text(const std::string& text,
     int width, int height, int button_area_width) const
 {
     const auto format = CAIRO_FORMAT_ARGB32;
@@ -1084,6 +1088,7 @@ cairo_surface_t*decoration_theme_t::get_button_surface(button_type_t button,
 #endif
 
         // Fallback to drawing icons if loading failed
+        // cppcheck-suppress knownConditionTrueFalse
         if (!icon_loaded)
         {
             cairo_set_line_width(cr, 1.0 * state.border);

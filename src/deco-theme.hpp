@@ -49,7 +49,7 @@ class decoration_theme_t
      * The caller is responsible for freeing the memory afterwards.
      * @param button_area_width Width occupied by buttons on the left side
      */
-    cairo_surface_t *render_text(std::string text, int width, int height,
+    cairo_surface_t *render_text(const std::string& text, int width, int height,
         int button_area_width = 0) const;
 
     struct button_state_t
