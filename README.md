@@ -134,8 +134,10 @@ Based on the original Wayfire `decoration` plugin, extended with GTK3 theme inte
 
 Same as Wayfire (MIT)
 
-## Disclaimer
-
-This project was created with the assistance of an AI agent. I do not have great expertise in C++, so the code has not really been reviewed. Anyone using or extending this project should independently verify its correctness, safety, and suitability for their use case. 
 ## Screenshot
 ![Screenshot of the plugin at work](assets/screenshot.png)
+
+## Disclaimer
+
+This project was developed with AI assistance. The code has been analysed with Codacy and Bandit. Use at your own discretion.  
+[![Codacy Badge](https://app.codacy.com/project/badge/Grade/8266f58320394753a1698af3d7687528)](https://app.codacy.com/gh/mkay/gtkdecor/dashboard)
