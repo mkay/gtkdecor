@@ -84,24 +84,31 @@ class wayfire_gtkdecor : public wf::plugin_interface_t
     {
         wayfire_gtkdecor *self = static_cast<wayfire_gtkdecor*>(data);
 
-        char buffer[1024];
-        int length = read(fd, buffer, sizeof(buffer));
-        if (length < 0)
+        char buffer[4096]
+            __attribute__((aligned(__alignof__(struct inotify_event))));
+        ssize_t length = read(fd, buffer, sizeof(buffer));
+        if (length <= 0)
         {
             return 0;
         }
 
         // Parse inotify events
-        int i = 0;
-        while (i < length)
+        ssize_t i = 0;
+        while (i + static_cast<ssize_t>(sizeof(struct inotify_event)) <= length)
         {
             struct inotify_event *event = (struct inotify_event*)&buffer[i];
+            ssize_t event_size = sizeof(struct inotify_event) + event->len;
+            if (i + event_size > length)
+            {
+                break;
+            }
+
             if (event->mask & (IN_MODIFY | IN_CLOSE_WRITE))
             {
                 LOGI("GTK settings changed, reloading decorations");
                 self->reload_all_decorations();
             }
-            i += sizeof(struct inotify_event) + event->len;
+            i += event_size;
         }
 
         return 0;
