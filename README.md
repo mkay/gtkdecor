@@ -139,5 +139,5 @@ Same as Wayfire (MIT)
 
 ## Disclaimer
 
-This project was developed with AI assistance. The code has been analysed with Codacy and Bandit. Use at your own discretion.  
+This project was developed with AI assistance. The code has been analysed with Codacy. Use at your own discretion.  
 [![Codacy Badge](https://app.codacy.com/project/badge/Grade/8266f58320394753a1698af3d7687528)](https://app.codacy.com/gh/mkay/gtkdecor/dashboard)
