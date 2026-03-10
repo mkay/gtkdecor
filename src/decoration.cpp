@@ -86,7 +86,7 @@ class wayfire_gtkdecor : public wf::plugin_interface_t
 
         char buffer[4096]
             __attribute__((aligned(__alignof__(struct inotify_event))));
-        ssize_t length = read(fd, buffer, sizeof(buffer));
+        ssize_t length = read(fd, buffer, sizeof(buffer)); // Flawfinder: ignore
         if (length <= 0)
         {
             return 0;

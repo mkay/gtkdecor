@@ -460,19 +460,17 @@ void decoration_theme_t::load_gtk_theme() const
 
 /** Create a new theme with the default parameters */
 decoration_theme_t::decoration_theme_t() :
-    theme_loaded(false)
+    theme_loaded(false),
+    theme_titlebar_bg_active{0.1, 0.1, 0.15, 1.0},
+    theme_titlebar_bg_inactive{0.15, 0.15, 0.2, 1.0},
+    theme_titlebar_fg_active{0.9, 0.9, 0.93, 1.0},
+    theme_titlebar_fg_inactive{0.7, 0.7, 0.73, 0.7},
+    theme_button_bg{0.4, 0.4, 0.4, 0.3},
+    theme_button_hover_bg{0.5, 0.5, 0.5, 0.4},
+    theme_button_active_bg{0.3, 0.3, 0.3, 0.5},
+    theme_font_family(""),
+    theme_font_size(0)
 {
-    // Theme loading is deferred until first render (lazy initialization)
-    // Initialize with fallback colors in case theme loading fails
-    theme_titlebar_bg_active = wf::color_t{0.1, 0.1, 0.15, 1.0};
-    theme_titlebar_bg_inactive = wf::color_t{0.15, 0.15, 0.2, 1.0};
-    theme_titlebar_fg_active = wf::color_t{0.9, 0.9, 0.93, 1.0};
-    theme_titlebar_fg_inactive = wf::color_t{0.7, 0.7, 0.73, 0.7};
-    theme_button_bg = wf::color_t{0.4, 0.4, 0.4, 0.3};  // Gray circle
-    theme_button_hover_bg = wf::color_t{0.5, 0.5, 0.5, 0.4};  // Lighter on hover
-    theme_button_active_bg = wf::color_t{0.3, 0.3, 0.3, 0.5};  // Darker when pressed
-    theme_font_family = "";
-    theme_font_size = 0;
 }
 
 decoration_theme_t::~decoration_theme_t()

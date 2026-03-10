@@ -77,7 +77,7 @@ class simple_decoration_node_t : public wf::scene::node_t, public wf::pointer_in
     int current_thickness;
     int current_titlebar;
 
-    simple_decoration_node_t(wayfire_toplevel_view view) :
+    explicit simple_decoration_node_t(wayfire_toplevel_view view) :
         node_t(false),
         theme{},
         layout{theme, [=] (wlr_box box) { wf::scene::damage_node(shared_from_this(), box + get_offset()); }}
@@ -333,10 +333,10 @@ class simple_decoration_node_t : public wf::scene::node_t, public wf::pointer_in
     }
 };
 
-wf::simple_decorator_t::simple_decorator_t(wayfire_toplevel_view view)
+wf::simple_decorator_t::simple_decorator_t(wayfire_toplevel_view view) :
+    deco(std::make_shared<simple_decoration_node_t>(view))
 {
     this->view = view;
-    deco = std::make_shared<simple_decoration_node_t>(view);
     deco->resize(wf::dimensions(view->get_pending_geometry()));
     wf::scene::add_back(view->get_surface_root_node(), deco);
 
