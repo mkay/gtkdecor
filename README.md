@@ -37,6 +37,19 @@ A  [Wayfire](https://github.com/WayfireWM/wayfire) plugin that provides **server
   - Border size
   - Fallback colors and fonts
 
+## Installation
+
+With Wayfire 0.11 or newer, the built-in plugin manager can build and install
+`gtkdecor` into your user prefix:
+
+```bash
+wayfire-plugin install https://github.com/mkay/gtkdecor
+```
+
+Later on, `wayfire-plugin update` picks up new releases and `wayfire-plugin
+rebuild` recompiles against an upgraded Wayfire. To build and install by hand
+instead, see [Development](#development) below.
+
 ## Configuration
 
 Add to your `~/.config/wayfire.ini`:

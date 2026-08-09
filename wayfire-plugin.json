@@ -1,0 +1,4 @@
+{
+  "name": "gtkdecor",
+  "setup": "Add gtkdecor to [core] plugins in ~/.config/wayfire.ini, and remove the built-in decoration plugin from that list -- running both at once decorates every window twice. Settings live in the [gtkdecor] section; the defaults follow your GTK theme, so no further configuration is required."
+}
