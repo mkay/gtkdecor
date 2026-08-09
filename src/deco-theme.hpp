@@ -87,6 +87,9 @@ class decoration_theme_t
     wf::option_wrapper_t<int> border_size{"gtkdecor/border_size"};
     wf::option_wrapper_t<wf::color_t> active_color{"gtkdecor/active_color"};
     wf::option_wrapper_t<wf::color_t> inactive_color{"gtkdecor/inactive_color"};
+    /** auto: use the GTK theme's metacity-1 titlebuttons if it ships them,
+     * otherwise draw them; gtk: always draw; pixmap: only use theme assets */
+    wf::option_wrapper_t<std::string> button_style{"gtkdecor/button_style"};
 
     // Rounded corner radii
     const int corner_radius = 12;        // Top corners
@@ -104,6 +107,7 @@ class decoration_theme_t
     mutable std::string theme_font_family;
     mutable int theme_font_size;
     mutable std::string icon_theme_name;
+    mutable std::string gtk_theme_name;
 
     void load_gtk_theme() const;
     std::string get_gtk_theme_name() const;
@@ -111,6 +115,25 @@ class decoration_theme_t
     std::string get_gtk_font_name() const;
     std::string find_theme_css_file(const std::string& theme_name) const;
     std::string find_icon_file(const std::string& icon_name, int size) const;
+
+    /**
+     * Locate a metacity-1 titlebutton asset for the given button and state,
+     * e.g. <theme>/metacity-1/titlebuttons/titlebutton-close-hover.svg
+     * @return Path to the asset, or "" if the theme ships none.
+     */
+    std::string find_titlebutton_file(button_type_t button,
+        const button_state_t& state) const;
+
+    /**
+     * Render a titlebutton asset at @size, cached by path and size so the
+     * SVG is not re-parsed on every frame of the hover animation.
+     * @return Borrowed surface owned by the cache, or nullptr on failure.
+     */
+    cairo_surface_t *get_titlebutton_asset(const std::string& path, int size) const;
+
+    /** Rendered titlebutton assets, keyed by "<path>@<size>" */
+    mutable std::map<std::string, cairo_surface_t*> titlebutton_cache;
+    void clear_titlebutton_cache() const;
     void parse_theme_css(const std::string& css_file) const;
     wf::color_t parse_css_color(const std::string& color_str) const;
 

@@ -5,6 +5,7 @@
 #include <sstream>
 #include <regex>
 #include <algorithm>
+#include <vector>
 #include <sys/stat.h>
 
 #ifdef HAVE_LIBRSVG
@@ -173,6 +174,185 @@ std::string decoration_theme_t::find_theme_css_file(const std::string& theme_nam
     }
 
     return "";
+}
+
+/**
+ * Locate a metacity-1 titlebutton asset for the given button and state.
+ *
+ * Themes such as WhiteSur ship a full set of complete, pre-coloured button
+ * images under <theme>/metacity-1/titlebuttons/, named
+ *   titlebutton-<action>[-backdrop][-hover|-active].<ext>
+ * Unlike the symbolic icons used by the drawn style, these are not masks:
+ * the colour is baked in, so they are painted as-is.
+ */
+std::string decoration_theme_t::find_titlebutton_file(button_type_t button,
+    const button_state_t& state) const
+{
+    if (gtk_theme_name.empty())
+    {
+        return "";
+    }
+
+    std::string action;
+    switch (button)
+    {
+      case BUTTON_CLOSE:
+        action = "close";
+        break;
+
+      case BUTTON_TOGGLE_MAXIMIZE:
+        action = "maximize";
+        break;
+
+      case BUTTON_MINIMIZE:
+        action = "minimize";
+        break;
+
+      default:
+        return "";
+    }
+
+    /* State suffixes, most specific first. A theme need not ship every
+     * variant, so we degrade towards the plain button. */
+    std::vector<std::string> suffixes;
+    const bool pressed = state.hover_progress < 0;
+    const bool hovered = state.hover_progress > 0;
+
+    if (!state.activated)
+    {
+        if (pressed)
+        {
+            suffixes.push_back("-backdrop-active");
+        }
+
+        if (hovered)
+        {
+            suffixes.push_back("-backdrop-hover");
+        }
+
+        suffixes.push_back("-backdrop");
+    } else if (pressed)
+    {
+        suffixes.push_back("-active");
+        suffixes.push_back("-hover");
+    } else if (hovered)
+    {
+        suffixes.push_back("-hover");
+    }
+
+    suffixes.push_back("");
+
+    const char *home = getenv("HOME");
+    std::vector<std::string> bases;
+    if (home)
+    {
+        bases.push_back(std::string(home) + "/.themes/");
+        bases.push_back(std::string(home) + "/.local/share/themes/");
+    }
+
+    bases.push_back("/usr/share/themes/");
+    bases.push_back("/usr/local/share/themes/");
+
+    for (const auto& suffix : suffixes)
+    {
+        for (const auto& base : bases)
+        {
+            const std::string stem = base + gtk_theme_name +
+                "/metacity-1/titlebuttons/titlebutton-" + action + suffix;
+            for (const auto *ext : {".svg", ".png"})
+            {
+                const std::string path = stem + ext;
+                struct stat buffer;
+                if (stat(path.c_str(), &buffer) == 0)
+                {
+                    return path;
+                }
+            }
+        }
+    }
+
+    return "";
+}
+
+/**
+ * Render a titlebutton asset at @size, cached so the SVG is not re-parsed on
+ * every frame of the hover animation.
+ */
+cairo_surface_t*decoration_theme_t::get_titlebutton_asset(const std::string& path, int size) const
+{
+    if (size <= 0)
+    {
+        return nullptr;
+    }
+
+    const std::string key = path + "@" + std::to_string(size);
+    auto it = titlebutton_cache.find(key);
+    if (it != titlebutton_cache.end())
+    {
+        return it->second;
+    }
+
+    cairo_surface_t *surface = cairo_image_surface_create(CAIRO_FORMAT_ARGB32, size, size);
+    cairo_t *cr = cairo_create(surface);
+    cairo_set_antialias(cr, CAIRO_ANTIALIAS_BEST);
+    bool ok = false;
+
+    if (path.size() > 4 && path.compare(path.size() - 4, 4, ".png") == 0)
+    {
+        cairo_surface_t *png = cairo_image_surface_create_from_png(path.c_str());
+        if (cairo_surface_status(png) == CAIRO_STATUS_SUCCESS)
+        {
+            const double sw = cairo_image_surface_get_width(png);
+            const double sh = cairo_image_surface_get_height(png);
+            if ((sw > 0) && (sh > 0))
+            {
+                cairo_scale(cr, size / sw, size / sh);
+                cairo_set_source_surface(cr, png, 0, 0);
+                cairo_paint(cr);
+                ok = true;
+            }
+        }
+
+        cairo_surface_destroy(png);
+    }
+#ifdef HAVE_LIBRSVG
+    else
+    {
+        GError *error = NULL;
+        RsvgHandle *handle = rsvg_handle_new_from_file(path.c_str(), &error);
+        if (handle)
+        {
+            /* Full-bleed: the asset is the whole button, padding is the
+             * theme's business, not ours. */
+            RsvgRectangle viewport = {
+                .x = 0.0,
+                .y = 0.0,
+                .width  = (double)size,
+                .height = (double)size
+            };
+            ok = rsvg_handle_render_document(handle, cr, &viewport, &error);
+            g_object_unref(handle);
+        }
+
+        if (error)
+        {
+            LOGE("Failed to render titlebutton ", path, ": ", error->message);
+            g_error_free(error);
+        }
+    }
+#endif
+
+    cairo_destroy(cr);
+
+    if (!ok)
+    {
+        cairo_surface_destroy(surface);
+        titlebutton_cache[key] = nullptr;  // negative cache, don't retry every frame
+        return nullptr;
+    }
+
+    titlebutton_cache[key] = surface;
+    return surface;
 }
 
 /** Find icon file path in icon theme */
@@ -410,6 +590,7 @@ void decoration_theme_t::load_gtk_theme() const
 
     // Get theme name from GTK settings
     std::string theme_name = get_gtk_theme_name();
+    gtk_theme_name = theme_name;  // cached for titlebutton asset lookup
     if (theme_name.empty())
     {
         LOGE("Could not determine GTK theme name, using fallback colors");
@@ -479,7 +660,17 @@ decoration_theme_t::decoration_theme_t() :
 
 decoration_theme_t::~decoration_theme_t()
 {
-    // No cleanup needed for CSS parsing
+    clear_titlebutton_cache();
+}
+
+void decoration_theme_t::clear_titlebutton_cache() const
+{
+    for (auto& [key, surface] : titlebutton_cache)
+    {
+        cairo_surface_destroy(surface);
+    }
+
+    titlebutton_cache.clear();
 }
 
 /** Force reload of theme - call when GTK theme/icon theme changes */
@@ -487,8 +678,10 @@ void decoration_theme_t::reload_theme() const
 {
     LOGI("Reloading GTK theme and icons");
     invalidate_cache();
+    clear_titlebutton_cache();
     theme_loaded = false;
     icon_theme_name.clear();
+    gtk_theme_name.clear();
     theme_font_family.clear();
     theme_font_size = 0;
     // Reset colors to defaults - they'll be reloaded
@@ -965,6 +1158,29 @@ cairo_surface_t*decoration_theme_t::get_button_surface(button_type_t button,
 {
     // Lazy initialization: load GTK theme on first render
     load_gtk_theme();
+
+    /* Pixmap style: if the GTK theme ships metacity-1 titlebuttons, the asset
+     * is the complete button - background, colour and glyph - so it replaces
+     * the drawn circle and symbolic icon entirely. */
+    const std::string style = button_style;
+    if (style != "gtk")
+    {
+        const std::string asset = find_titlebutton_file(button, state);
+        if (!asset.empty())
+        {
+            cairo_surface_t *src = get_titlebutton_asset(asset, static_cast<int>(state.width));
+            if (src)
+            {
+                cairo_surface_t *out = cairo_image_surface_create(
+                    CAIRO_FORMAT_ARGB32, state.width, state.height);
+                cairo_t *out_cr = cairo_create(out);
+                cairo_set_source_surface(out_cr, src, 0, 0);
+                cairo_paint(out_cr);
+                cairo_destroy(out_cr);
+                return out;
+            }
+        }
+    }
 
     cairo_surface_t *button_surface = cairo_image_surface_create(
         CAIRO_FORMAT_ARGB32, state.width, state.height);
