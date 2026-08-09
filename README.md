@@ -206,7 +206,14 @@ Based on the original Wayfire `decoration` plugin, extended with GTK3 theme inte
 Same as Wayfire (MIT)
 
 ## Screenshot
-![Screenshot of the plugin at work](assets/screenshot.png)
+
+![The same window decorated under four different GTK themes](assets/screenshot.png)
+
+The same Chromium window, decorated four times. From back to front: **Tokyonight**,
+**Nordic**, **Adwaita Dark** and **WhiteSur**. Nordic and WhiteSur ship their own
+window button images, which are used as-is; Tokyonight and Adwaita Dark ship none, so
+their buttons are drawn from the theme colors and your icon theme. Only the frame
+changes — the window itself is identical in all four.
 
 ## Disclaimer
 
