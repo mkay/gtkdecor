@@ -14,6 +14,11 @@ A  [Wayfire](https://github.com/WayfireWM/wayfire) plugin that provides **server
   - Supports SVG symbolic icons via librsvg
   - Falls back to simple drawn icons if theme icons can't be loaded
 
+- **Themed Window Buttons**: Uses your GTK theme's own button images when it ships them
+  - macOS-style traffic lights from themes like WhiteSur, MacTahoe and Nordic
+  - Separate images for hover, pressed and unfocused states
+  - Falls back to drawing GTK-style buttons for themes without them
+
 - **Font Integration**: Automatically uses your GTK font settings
   - Reads `gtk-font-name` from `~/.config/gtk-3.0/settings.ini`
   - Font size scaled 1.12x to match native GTK titlebar size
@@ -44,6 +49,12 @@ plugins = ... gtkdecor ...
 # Button order from left to right
 button_order = close minimize maximize
 
+# Window button style:
+#   auto   - use the theme's button images if it has them, else draw (default)
+#   gtk    - always draw GTK-style buttons
+#   pixmap - prefer the theme's images, draw only as a fallback
+button_style = auto
+
 # Titlebar and border sizes
 title_height = 28
 border_size = 4
@@ -59,9 +70,55 @@ ignore_views = none
 forced_views = none
 ```
 
+## Window Button Images
+
+Many GTK themes ship their own window button images, and `gtkdecor` will use them
+automatically. This is what gives you real macOS-style traffic lights with themes
+like **WhiteSur**, **MacTahoe** and **Nordic**, rather than an approximation.
+
+The images are used as-is — colors are already baked into them — with separate
+versions picked up for hover, pressed and unfocused windows where the theme
+provides them.
+
+Themes store these in `metacity-1/`, and two naming conventions are supported:
+
+```
+metacity-1/titlebuttons/titlebutton-close-hover.svg   # WhiteSur, MacTahoe
+metacity-1/close_focused_prelight.png                 # Nordic
+```
+
+If your theme ships no such images, buttons are drawn in the GTK style using your
+theme colors and icon theme. That is the correct result for the many themes that
+define their buttons purely in the theme XML, and it is what you will see with
+e.g. Materia, Tokyonight or Arc.
+
+### Does your theme not work?
+
+**Please open an issue.** If your theme has its own window buttons but `gtkdecor`
+draws its own instead, it is most likely storing them in a layout that is not
+recognised yet — and that is easy to add once we know about it.
+
+Helpful things to include:
+
+- The theme name, and where you installed it from
+- The output of `ls ~/.themes/<Theme>/metacity-1/` (or
+  `/usr/share/themes/<Theme>/metacity-1/`)
+- What you expected the buttons to look like
+
+No promises, but if your theme ships a straightforward set of button images —
+one per button and state, whatever they happen to be named — support for it is
+usually a small change and likely to get added.
+
+Some themes take a different approach and build their buttons at draw time from
+the Metacity theme XML, layering and recoloring shared images. Supporting that
+would mean implementing much of the Metacity theme engine, so those are unlikely
+to be added. Themes that define their buttons purely in XML, with no images at
+all, are in the same position. In both cases the drawn buttons are the intended
+result rather than a bug.
+
 ## Requirements
 
-- Wayfire >= 0.10.1
+- Wayfire >= 0.11.0
 - Cairo
 - Pango
 - librsvg 2.0 (optional, for SVG icon theme support)
@@ -96,6 +153,7 @@ The original `decoration` plugin provides simple static decorations. `gtkdecor` 
 
 - ✅ Native GTK theme integration (colors, fonts)
 - ✅ Icon theme support for buttons
+- ✅ Themed window buttons, including macOS-style traffic lights
 - ✅ Live theme reloading
 - ✅ Better visual match with GTK applications
 - ✅ Rounded corners
