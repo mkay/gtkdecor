@@ -2,6 +2,15 @@
 
 A  [Wayfire](https://github.com/WayfireWM/wayfire) plugin that provides **server-side window decorations** (SSDs) with native GTK3 theme integration.
 
+![The same window decorated under four different GTK themes](assets/screenshot.png)
+
+The same Chromium window, decorated four times. From back to front: **Tokyonight**,
+**Nordic**, **Adwaita Dark** and **WhiteSur**. Nordic and WhiteSur ship their own
+window button images, which are used as-is. Tokyonight and Adwaita Dark ship none, so
+their buttons are drawn from the theme colors and the configured icon theme — which is
+why those two differ from each other as well. Only the frame changes; the window itself
+is identical in all four.
+
 ## Installation
 
 Requires **Wayfire 0.11 or newer**. Wayfire's own plugin manager builds and installs
@@ -216,17 +225,6 @@ Based on the original Wayfire `decoration` plugin, extended with GTK3 theme inte
 ## License
 
 Same as Wayfire (MIT)
-
-## Screenshot
-
-![The same window decorated under four different GTK themes](assets/screenshot.png)
-
-The same Chromium window, decorated four times. From back to front: **Tokyonight**,
-**Nordic**, **Adwaita Dark** and **WhiteSur**. Nordic and WhiteSur ship their own
-window button images, which are used as-is. Tokyonight and Adwaita Dark ship none, so
-their buttons are drawn from the theme colors and the configured icon theme — which is
-why those two differ from each other as well. Only the frame changes; the window itself
-is identical in all four.
 
 ## Disclaimer
 
