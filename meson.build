@@ -1,5 +1,5 @@
 project('gtkdecor', 'cpp',
-    version: '0.4.0',
+    version: '0.4.1',
     default_options: ['cpp_std=c++17'])
 
 wayfire = dependency('wayfire', version: '>=0.11.0')
