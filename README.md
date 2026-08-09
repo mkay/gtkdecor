@@ -2,6 +2,31 @@
 
 A  [Wayfire](https://github.com/WayfireWM/wayfire) plugin that provides **server-side window decorations** (SSDs) with native GTK3 theme integration.
 
+## Installation
+
+Requires **Wayfire 0.11 or newer**. Wayfire's own plugin manager builds and installs
+`gtkdecor` into your user prefix in one step:
+
+```bash
+wayfire-plugin install https://github.com/mkay/gtkdecor
+```
+
+Then enable it in `~/.config/wayfire.ini`, and remove the built-in `decoration` plugin
+from the same list — running both at once decorates every window twice:
+
+```ini
+[core]
+plugins = ... gtkdecor ...
+```
+
+Restart Wayfire and you are done. The defaults follow your GTK theme, so nothing
+further is required; see [Configuration](#configuration) to change the button order,
+sizes or fallback colors.
+
+Later on, `wayfire-plugin update` picks up new releases and `wayfire-plugin rebuild`
+recompiles against an upgraded Wayfire. To build and install by hand instead, see
+[Development](#development).
+
 ## Features
 
 - **Automatic GTK3 Theme Integration**: Decorations automatically match your GTK theme
@@ -36,19 +61,6 @@ A  [Wayfire](https://github.com/WayfireWM/wayfire) plugin that provides **server
   - Titlebar height
   - Border size
   - Fallback colors and fonts
-
-## Installation
-
-With Wayfire 0.11 or newer, the built-in plugin manager can build and install
-`gtkdecor` into your user prefix:
-
-```bash
-wayfire-plugin install https://github.com/mkay/gtkdecor
-```
-
-Later on, `wayfire-plugin update` picks up new releases and `wayfire-plugin
-rebuild` recompiles against an upgraded Wayfire. To build and install by hand
-instead, see [Development](#development) below.
 
 ## Configuration
 
