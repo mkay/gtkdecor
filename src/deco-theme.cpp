@@ -552,32 +552,32 @@ void decoration_theme_t::render_background(const wf::scene::render_instruction_t
         if (bg_cache.titlebar_tex)
         {
             data.pass->add_texture(bg_cache.titlebar_tex->get_texture(),
-                data.target, bg_cache.titlebar_rect + wf::point_t{rectangle.x, rectangle.y}
-                    - wf::point_t{bg_cache.geometry.x, bg_cache.geometry.y}, data.damage);
+                data.target, bg_cache.titlebar_rect + wf::pointf_t{rectangle.x, rectangle.y}
+                    - wf::pointf_t{bg_cache.geometry.x, bg_cache.geometry.y}, data.damage);
         }
         if (bg_cache.left_tex)
         {
             data.pass->add_texture(bg_cache.left_tex->get_texture(),
-                data.target, bg_cache.left_rect + wf::point_t{rectangle.x, rectangle.y}
-                    - wf::point_t{bg_cache.geometry.x, bg_cache.geometry.y}, data.damage);
+                data.target, bg_cache.left_rect + wf::pointf_t{rectangle.x, rectangle.y}
+                    - wf::pointf_t{bg_cache.geometry.x, bg_cache.geometry.y}, data.damage);
         }
         if (bg_cache.right_tex)
         {
             data.pass->add_texture(bg_cache.right_tex->get_texture(),
-                data.target, bg_cache.right_rect + wf::point_t{rectangle.x, rectangle.y}
-                    - wf::point_t{bg_cache.geometry.x, bg_cache.geometry.y}, data.damage);
+                data.target, bg_cache.right_rect + wf::pointf_t{rectangle.x, rectangle.y}
+                    - wf::pointf_t{bg_cache.geometry.x, bg_cache.geometry.y}, data.damage);
         }
         if (bg_cache.bottom_tex)
         {
             data.pass->add_texture(bg_cache.bottom_tex->get_texture(),
-                data.target, bg_cache.bottom_rect + wf::point_t{rectangle.x, rectangle.y}
-                    - wf::point_t{bg_cache.geometry.x, bg_cache.geometry.y}, data.damage);
+                data.target, bg_cache.bottom_rect + wf::pointf_t{rectangle.x, rectangle.y}
+                    - wf::pointf_t{bg_cache.geometry.x, bg_cache.geometry.y}, data.damage);
         }
         if (bg_cache.outline_tex)
         {
             data.pass->add_texture(bg_cache.outline_tex->get_texture(),
-                data.target, bg_cache.outline_rect + wf::point_t{rectangle.x, rectangle.y}
-                    - wf::point_t{bg_cache.geometry.x, bg_cache.geometry.y}, data.damage);
+                data.target, bg_cache.outline_rect + wf::pointf_t{rectangle.x, rectangle.y}
+                    - wf::pointf_t{bg_cache.geometry.x, bg_cache.geometry.y}, data.damage);
         }
         return;
     }
@@ -607,7 +607,7 @@ void decoration_theme_t::render_background(const wf::scene::render_instruction_t
     int titlebar_h = title_height + border_size;
     wf::geometry_t titlebar_rect = {
         rectangle.x, rectangle.y,
-        rectangle.width, titlebar_h
+        rectangle.width, (double)titlebar_h
     };
 
     // Shadow parameters
@@ -705,7 +705,7 @@ void decoration_theme_t::render_background(const wf::scene::render_instruction_t
 
         bg_cache.left_rect = {
             rectangle.x - shadow_blur, rectangle.y + corner_radius - 1,
-            border_size + shadow_blur, border_h
+            (double)(border_size + shadow_blur), (double)border_h
         };
         bg_cache.left_tex = std::make_unique<wf::owned_texture_t>(left_surface);
         data.pass->add_texture(bg_cache.left_tex->get_texture(), data.target,
@@ -742,7 +742,7 @@ void decoration_theme_t::render_background(const wf::scene::render_instruction_t
 
         bg_cache.right_rect = {
             rectangle.x + rectangle.width - border_size, rectangle.y + corner_radius - 1,
-            border_size + shadow_blur, border_h
+            (double)(border_size + shadow_blur), (double)border_h
         };
         bg_cache.right_tex = std::make_unique<wf::owned_texture_t>(right_surface);
         data.pass->add_texture(bg_cache.right_tex->get_texture(), data.target,
@@ -808,7 +808,7 @@ void decoration_theme_t::render_background(const wf::scene::render_instruction_t
         bg_cache.bottom_rect = {
             rectangle.x - shadow_blur,
             rectangle.y + rectangle.height - border_size - (int)br,
-            surface_w, surface_h
+            (double)surface_w, (double)surface_h
         };
         bg_cache.bottom_tex = std::make_unique<wf::owned_texture_t>(bottom_surface);
         data.pass->add_texture(bg_cache.bottom_tex->get_texture(), data.target,

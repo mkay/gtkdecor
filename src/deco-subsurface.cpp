@@ -70,7 +70,7 @@ class simple_decoration_node_t : public wf::scene::node_t, public wf::pointer_in
   public:
     wf::decor::decoration_theme_t theme;
     wf::decor::decoration_layout_t layout;
-    wf::region_t cached_region;
+    wf::regionf_t cached_region;
 
     wf::dimensions_t size;
 
@@ -80,7 +80,10 @@ class simple_decoration_node_t : public wf::scene::node_t, public wf::pointer_in
     explicit simple_decoration_node_t(wayfire_toplevel_view view) :
         node_t(false),
         theme{},
-        layout{theme, [=] (wlr_box box) { wf::scene::damage_node(shared_from_this(), box + get_offset()); }}
+        layout{theme, [=] (wf::geometry_t box)
+        {
+            wf::scene::damage_node(shared_from_this(), box + get_offset());
+        }}
     {
         LOGI("Creating decoration for view: ", view->get_title());
         this->_view = view->weak_from_this();
@@ -99,16 +102,17 @@ class simple_decoration_node_t : public wf::scene::node_t, public wf::pointer_in
         update_decoration_size();
     }
 
-    wf::point_t get_offset()
+    wf::pointf_t get_offset()
     {
-        return {-current_thickness, -current_titlebar};
+        return {(double)-current_thickness, (double)-current_titlebar};
     }
 
     void render(const wf::scene::render_instruction_t& data)
     {
         auto origin = get_offset();
         /* Clear background */
-        wlr_box geometry{origin.x, origin.y, size.width, size.height};
+        wf::geometry_t geometry{origin.x, origin.y,
+            (double)size.width, (double)size.height};
 
         bool activated = false;
         if (auto view = _view.lock())
@@ -126,7 +130,7 @@ class simple_decoration_node_t : public wf::scene::node_t, public wf::pointer_in
             {
                 wf::geometry_t title_geometry = item->get_geometry() + origin;
                 update_title(title_geometry.width, title_geometry.height, data.target.scale);
-                if (title_texture.tex.get_texture().texture != NULL)
+                if (title_texture.tex.get_texture() != NULL)
                 {
                     data.pass->add_texture(title_texture.tex.get_texture(), data.target,
                         title_geometry, data.damage);
@@ -143,7 +147,7 @@ class simple_decoration_node_t : public wf::scene::node_t, public wf::pointer_in
     {
         if (auto view = _view.lock())
         {
-            wf::pointf_t local = at - wf::pointf_t{get_offset()};
+            wf::pointf_t local = at - get_offset();
             if (cached_region.contains_pointf(local) && view->is_mapped())
             {
                 return wf::scene::input_node_t{
@@ -186,10 +190,10 @@ class simple_decoration_node_t : public wf::scene::node_t, public wf::pointer_in
         }
 
         void schedule_instructions(std::vector<wf::scene::render_instruction_t>& instructions,
-            const wf::render_target_t& target, wf::region_t& damage) override
+            const wf::render_target_t& target, wf::regionf_t& damage) override
         {
-            auto our_region = self->cached_region + self->get_offset();
-            wf::region_t our_damage = damage & our_region;
+            auto our_region = self->get_bounding_box();
+            wf::regionf_t our_damage = damage & our_region;
             if (!our_damage.empty())
             {
                 instructions.push_back(wf::scene::render_instruction_t{
@@ -220,7 +224,7 @@ class simple_decoration_node_t : public wf::scene::node_t, public wf::pointer_in
     /* wf::compositor_surface_t implementation */
     void handle_pointer_enter(wf::pointf_t point) override
     {
-        point -= wf::pointf_t{get_offset()};
+        point -= get_offset();
         layout.handle_motion(point.x, point.y);
     }
 
@@ -231,7 +235,7 @@ class simple_decoration_node_t : public wf::scene::node_t, public wf::pointer_in
 
     void handle_pointer_motion(wf::pointf_t to, uint32_t) override
     {
-        to -= wf::pointf_t{get_offset()};
+        to -= get_offset();
         handle_action(layout.handle_motion(to.x, to.y));
     }
 
@@ -295,7 +299,7 @@ class simple_decoration_node_t : public wf::scene::node_t, public wf::pointer_in
 
     void handle_touch_motion(uint32_t time_ms, int finger_id, wf::pointf_t position) override
     {
-        position -= wf::pointf_t{get_offset()};
+        position -= get_offset();
         handle_action(layout.handle_motion(position.x, position.y));
     }
 
@@ -379,10 +383,10 @@ wf::decoration_margins_t wf::simple_decorator_t::get_margins(const wf::toplevel_
     const int thickness = deco->theme.get_border_size();
     const int titlebar  = deco->theme.get_title_height() + deco->theme.get_border_size();
     return wf::decoration_margins_t{
-        .left   = thickness,
-        .right  = thickness,
-        .bottom = thickness,
-        .top    = titlebar,
+        .left   = (double)thickness,
+        .right  = (double)thickness,
+        .bottom = (double)thickness,
+        .top    = (double)titlebar,
     };
 }
 

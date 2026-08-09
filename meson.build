@@ -2,7 +2,7 @@ project('gtkdecor', 'cpp',
     version: '0.2.1',
     default_options: ['cpp_std=c++17'])
 
-wayfire = dependency('wayfire', version: '>=0.10.1')
+wayfire = dependency('wayfire', version: '>=0.11.0')
 librsvg = dependency('librsvg-2.0', required: false)
 
 gtkdecor_deps = [wayfire]
