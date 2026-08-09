@@ -1,5 +1,5 @@
 pkgname=gtkdecor
-pkgver=0.2.1
+pkgver=0.3.0
 pkgrel=1
 pkgdesc="GTK3-themed server-side decorations for Wayfire"
 arch=('x86_64')
