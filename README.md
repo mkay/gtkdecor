@@ -223,9 +223,10 @@ Same as Wayfire (MIT)
 
 The same Chromium window, decorated four times. From back to front: **Tokyonight**,
 **Nordic**, **Adwaita Dark** and **WhiteSur**. Nordic and WhiteSur ship their own
-window button images, which are used as-is; Tokyonight and Adwaita Dark ship none, so
-their buttons are drawn from the theme colors and your icon theme. Only the frame
-changes — the window itself is identical in all four.
+window button images, which are used as-is. Tokyonight and Adwaita Dark ship none, so
+their buttons are drawn from the theme colors and the configured icon theme — which is
+why those two differ from each other as well. Only the frame changes; the window itself
+is identical in all four.
 
 ## Disclaimer
 
