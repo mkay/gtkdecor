@@ -179,9 +179,14 @@ std::string decoration_theme_t::find_theme_css_file(const std::string& theme_nam
 /**
  * Locate a metacity-1 titlebutton asset for the given button and state.
  *
- * Themes such as WhiteSur ship a full set of complete, pre-coloured button
- * images under <theme>/metacity-1/titlebuttons/, named
- *   titlebutton-<action>[-backdrop][-hover|-active].<ext>
+ * Themes ship a full set of complete, pre-coloured button images under
+ * <theme>/metacity-1/. Two naming conventions are in use:
+ *
+ *   titlebuttons/titlebutton-<action>[-backdrop][-hover|-active].<ext>
+ *       WhiteSur, MacTahoe
+ *   <action>_<focused|unfocused>[_normal|_prelight|_pressed].<ext>
+ *       Nordic
+ *
  * Unlike the symbolic icons used by the drawn style, these are not masks:
  * the colour is baked in, so they are painted as-is.
  */
@@ -212,35 +217,51 @@ std::string decoration_theme_t::find_titlebutton_file(button_type_t button,
         return "";
     }
 
-    /* State suffixes, most specific first. A theme need not ship every
-     * variant, so we degrade towards the plain button. */
-    std::vector<std::string> suffixes;
     const bool pressed = state.hover_progress < 0;
     const bool hovered = state.hover_progress > 0;
+
+    /* Two naming conventions are in the wild, and a theme uses one or the
+     * other, so both are tried at each state:
+     *
+     *   WhiteSur, MacTahoe:  metacity-1/titlebuttons/titlebutton-close-hover.svg
+     *   Nordic:              metacity-1/close_focused_prelight.png
+     *
+     * Candidates are ordered most-specific-state first and degrade towards
+     * the plain button, since no theme ships every variant. */
+    std::vector<std::string> candidates;
+    auto add_state = [&] (const std::string& modern, const std::string& classic)
+    {
+        candidates.push_back("/metacity-1/titlebuttons/titlebutton-" + action + modern);
+        candidates.push_back("/metacity-1/" + action + classic);
+    };
 
     if (!state.activated)
     {
         if (pressed)
         {
-            suffixes.push_back("-backdrop-active");
+            add_state("-backdrop-active", "_unfocused_pressed");
         }
 
         if (hovered)
         {
-            suffixes.push_back("-backdrop-hover");
+            add_state("-backdrop-hover", "_unfocused_prelight");
         }
 
-        suffixes.push_back("-backdrop");
+        add_state("-backdrop", "_unfocused");
     } else if (pressed)
     {
-        suffixes.push_back("-active");
-        suffixes.push_back("-hover");
+        add_state("-active", "_focused_pressed");
+        add_state("-hover", "_focused_prelight");
     } else if (hovered)
     {
-        suffixes.push_back("-hover");
+        add_state("-hover", "_focused_prelight");
     }
 
-    suffixes.push_back("");
+    /* Least specific: the plain, focused button. */
+    candidates.push_back("/metacity-1/titlebuttons/titlebutton-" + action);
+    candidates.push_back("/metacity-1/" + action + "_focused_normal");
+    candidates.push_back("/metacity-1/" + action + "_focused");
+    candidates.push_back("/metacity-1/" + action);
 
     const char *home = getenv("HOME");
     std::vector<std::string> bases;
@@ -253,15 +274,13 @@ std::string decoration_theme_t::find_titlebutton_file(button_type_t button,
     bases.push_back("/usr/share/themes/");
     bases.push_back("/usr/local/share/themes/");
 
-    for (const auto& suffix : suffixes)
+    for (const auto& candidate : candidates)
     {
         for (const auto& base : bases)
         {
-            const std::string stem = base + gtk_theme_name +
-                "/metacity-1/titlebuttons/titlebutton-" + action + suffix;
             for (const auto *ext : {".svg", ".png"})
             {
-                const std::string path = stem + ext;
+                const std::string path = base + gtk_theme_name + candidate + ext;
                 struct stat buffer;
                 if (stat(path.c_str(), &buffer) == 0)
                 {
