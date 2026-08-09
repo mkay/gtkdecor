@@ -2,10 +2,12 @@
 set -euo pipefail
 
 VERSION="${1:-}"
+TITLE="${2:-}"
 
 if [[ -z "$VERSION" ]]; then
-    echo "Usage: ./release.sh <version>"
+    echo "Usage: ./release.sh <version> [title]"
     echo "Example: ./release.sh 1.2.3"
+    echo "Example: ./release.sh 1.2.3 \"Some Catchy Name\""
     exit 1
 fi
 
@@ -13,6 +15,7 @@ fi
 # git tag gets the v prefix
 VERSION="${VERSION#v}"
 TAG="v$VERSION"
+TITLE="${TITLE:-$TAG}"
 
 # Auto-detect project name from meson.build
 PROJECT_NAME=$(grep -oP "^project\(\s*'\K[^']+" meson.build)
@@ -74,7 +77,7 @@ if [[ -n "$GITHUB_REMOTE" ]] && command -v gh &>/dev/null; then
     GH_REPO=$(git remote get-url "$GITHUB_REMOTE" | sed 's|.*github.com[:/]||;s|\.git$||')
     gh release create "$TAG" "${RELEASE_ASSETS[@]}" \
         --repo "$GH_REPO" \
-        --title "$TAG" \
+        --title "$TITLE" \
         --notes "$RELEASE_NOTES"
     echo "==> GitHub release created"
 fi
@@ -110,8 +113,8 @@ if [[ -n "$FORGEJO_URL" && -n "${FORGEJO_TOKEN:-}" ]]; then
     RELEASE_JSON=$(curl -s -X POST "https://$FORGEJO_URL/api/v1/repos/$REPO_PATH/releases" \
         -H "Authorization: token $FORGEJO_TOKEN" \
         -H "Content-Type: application/json" \
-        -d "$(jq -n --arg tag "$TAG" --arg body "$RELEASE_NOTES" --arg sha "$COMMIT_SHA" \
-            '{tag_name: $tag, name: $tag, body: $body, target_commitish: $sha}')")
+        -d "$(jq -n --arg tag "$TAG" --arg title "$TITLE" --arg body "$RELEASE_NOTES" --arg sha "$COMMIT_SHA" \
+            '{tag_name: $tag, name: $title, body: $body, target_commitish: $sha}')")
 
     RELEASE_ID=$(echo "$RELEASE_JSON" | jq -r '.id')
 

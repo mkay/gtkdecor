@@ -5,7 +5,7 @@ pkgdesc="GTK3-themed server-side decorations for Wayfire"
 arch=('x86_64')
 license=('MIT')
 depends=(
-  'wayfire'
+  'wayfire>=0.11.0'
   'cairo'
   'pango'
   'librsvg'
