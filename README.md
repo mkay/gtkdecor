@@ -2,6 +2,8 @@
 
 A  [Wayfire](https://github.com/WayfireWM/wayfire) plugin that provides **server-side window decorations** (SSDs) with native GTK3 theme integration.
 
+A project by Kreuder. Based on Wayfire's built-in [`decoration`](https://github.com/WayfireWM/wayfire/tree/master/plugins/decor) plugin by Iliya Bozhinov, which it extends with GTK3 theming and replaces.
+
 ![The same window decorated under four different GTK themes](assets/screenshot.png)
 
 The same Chromium window, decorated four times. From back to front: **Tokyonight**,
