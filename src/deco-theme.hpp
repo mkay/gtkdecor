@@ -135,6 +135,21 @@ class decoration_theme_t
     mutable std::map<std::string, cairo_surface_t*> titlebutton_cache;
     void clear_titlebutton_cache() const;
     void parse_theme_css(const std::string& css_file) const;
+
+    /** A window button's colours, as declared in the theme's stylesheet */
+    struct titlebutton_colors_t
+    {
+        wf::color_t bg;
+        wf::color_t pressed_bg;
+        wf::color_t backdrop_bg;
+        wf::color_t fg;
+        wf::color_t hover_fg;
+        wf::color_t backdrop_hover_fg;
+    };
+
+    /** Filled only for themes that colour each button differently */
+    mutable std::map<button_type_t, titlebutton_colors_t> titlebutton_colors;
+    void parse_titlebutton_colors(std::string css) const;
     wf::color_t parse_css_color(const std::string& color_str) const;
 
     // Background surface cache — avoids recreating Cairo surfaces every frame

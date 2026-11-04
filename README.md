@@ -121,6 +121,8 @@ metacity-1/titlebuttons/titlebutton-close-hover.svg   # WhiteSur, MacTahoe
 metacity-1/close_focused_prelight.png                 # Nordic
 ```
 
+Some themes, such as **Colloid**, have no such images and color each button in their stylesheet instead. Those colors are used for the drawn buttons, so you get the theme's traffic lights there too.
+
 If your theme ships no such images, buttons are drawn in the GTK style using your
 theme colors and icon theme. That is the correct result for the many themes that
 define their buttons purely in the theme XML, and it is what you will see with

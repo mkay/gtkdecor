@@ -21,6 +21,16 @@ wf::color_t decoration_theme_t::parse_css_color(const std::string& color_str) co
 {
     wf::color_t color{0, 0, 0, 1.0};
 
+    if (color_str == "transparent")
+    {
+        return wf::color_t{0, 0, 0, 0};
+    }
+
+    if (color_str == "white")
+    {
+        return wf::color_t{1, 1, 1, 1};
+    }
+
     // Match hex color: #rrggbb or #rrggbbaa
     std::regex hex_regex("#([0-9a-fA-F]{6})([0-9a-fA-F]{2})?");
     std::smatch hex_match;
@@ -158,6 +168,8 @@ std::string decoration_theme_t::find_theme_css_file(const std::string& theme_nam
     {
         search_paths.push_back(std::string(home) + "/.themes/" + theme_name + "/gtk-3.0/gtk.css");
         search_paths.push_back(std::string(home) + "/.themes/" + theme_name + "/gtk-3.0/gtk-dark.css");
+        search_paths.push_back(std::string(home) + "/.local/share/themes/" + theme_name + "/gtk-3.0/gtk.css");
+        search_paths.push_back(std::string(home) + "/.local/share/themes/" + theme_name + "/gtk-3.0/gtk-dark.css");
     }
 
     search_paths.push_back("/usr/share/themes/" + theme_name + "/gtk-3.0/gtk.css");
@@ -475,6 +487,146 @@ std::string decoration_theme_t::find_icon_file(const std::string& icon_name, int
     return "";
 }
 
+/**
+ * Read the colours a theme gives its window buttons in the stylesheet.
+ *
+ * Colloid has no button images of its own to load: its traffic lights exist
+ * only as rules like button.close.titlebutton { background-color: #bf616a; }.
+ * Only the plain selectors count; the longer ones that also match are specific
+ * to client-side headerbars.
+ *
+ * Many themes declare these rules with one neutral colour for all three
+ * buttons. That is not colour-coding, so those keep the default drawn style.
+ */
+void decoration_theme_t::parse_titlebutton_colors(std::string css) const
+{
+    for (size_t start = css.find("/*"); start != std::string::npos; start = css.find("/*", start))
+    {
+        const size_t end = css.find("*/", start);
+        css.erase(start, end == std::string::npos ? end : end + 2 - start);
+    }
+
+    auto trim = [] (const std::string& text)
+    {
+        const char *space = " \t\r\n";
+        const size_t first = text.find_first_not_of(space);
+        return (first == std::string::npos) ? std::string{} :
+               text.substr(first, text.find_last_not_of(space) - first + 1);
+    };
+
+    /* "<selector>/<property>" -> value, later rules overriding earlier ones */
+    std::map<std::string, std::string> declared;
+    const std::regex not_regex(R"(:not\([^)]*\))");
+
+    size_t pos = 0;
+    while (true)
+    {
+        const size_t open = css.find_first_of("{}", pos);
+        if (open == std::string::npos)
+        {
+            break;
+        }
+
+        /* A stray '}' closes a nested block such as @keyframes */
+        if (css[open] == '}')
+        {
+            pos = open + 1;
+            continue;
+        }
+
+        const size_t close = css.find('}', open);
+        if (close == std::string::npos)
+        {
+            break;
+        }
+
+        std::string selectors = css.substr(pos, open - pos);
+        const std::string body = css.substr(open + 1, close - open - 1);
+        pos = close + 1;
+
+        if (selectors.find(".titlebutton") == std::string::npos)
+        {
+            continue;
+        }
+
+        /* Drop any at-statement such as @define-color ahead of the rule */
+        const size_t statement_end = selectors.rfind(';');
+        if (statement_end != std::string::npos)
+        {
+            selectors.erase(0, statement_end + 1);
+        }
+
+        selectors = std::regex_replace(selectors, not_regex, "");
+
+        std::stringstream selector_list(selectors);
+        std::string selector;
+        while (std::getline(selector_list, selector, ','))
+        {
+            selector = trim(selector);
+
+            std::stringstream declarations(body);
+            std::string declaration;
+            while (std::getline(declarations, declaration, ';'))
+            {
+                const size_t colon = declaration.find(':');
+                if (colon == std::string::npos)
+                {
+                    continue;
+                }
+
+                const std::string property = trim(declaration.substr(0, colon));
+                if ((property == "background-color") || (property == "color"))
+                {
+                    declared[selector + "/" + property] = trim(declaration.substr(colon + 1));
+                }
+            }
+        }
+    }
+
+    auto value_of = [&] (const std::string& action, const std::string& pseudo,
+                         const std::string& property)
+    {
+        auto it = declared.find("button." + action + ".titlebutton" + pseudo + "/" + property);
+        return (it == declared.end()) ? std::string{} : it->second;
+    };
+
+    const std::string close_bg    = value_of("close", "", "background-color");
+    const std::string minimize_bg = value_of("minimize", "", "background-color");
+    const std::string maximize_bg = value_of("maximize", "", "background-color");
+    if (close_bg.empty() || minimize_bg.empty() || maximize_bg.empty() ||
+        ((close_bg == minimize_bg) && (close_bg == maximize_bg)))
+    {
+        return;
+    }
+
+    const std::pair<button_type_t, std::string> buttons[] = {
+        {BUTTON_CLOSE, "close"},
+        {BUTTON_MINIMIZE, "minimize"},
+        {BUTTON_TOGGLE_MAXIMIZE, "maximize"},
+    };
+
+    for (const auto& [button, action] : buttons)
+    {
+        auto color_of = [&, &action = action] (const std::string& pseudo,
+                                               const std::string& property, wf::color_t fallback)
+        {
+            const std::string value = value_of(action, pseudo, property);
+            return value.empty() ? fallback : parse_css_color(value);
+        };
+
+        titlebutton_colors_t colors;
+        colors.bg = parse_css_color(value_of(action, "", "background-color"));
+        colors.pressed_bg  = color_of(":active", "background-color", colors.bg);
+        colors.backdrop_bg = color_of(":backdrop", "background-color", colors.bg);
+        colors.fg = color_of("", "color", wf::color_t{1, 1, 1, 1});
+        colors.hover_fg = color_of(":hover", "color", colors.fg);
+        colors.backdrop_hover_fg = color_of(":backdrop:hover", "color", colors.hover_fg);
+        titlebutton_colors[button] = colors;
+    }
+
+    LOGI("Theme colours its window buttons individually");
+}
+
 /** Parse theme CSS file and extract colors */
 void decoration_theme_t::parse_theme_css(const std::string& css_file) const
 {
@@ -531,6 +683,28 @@ void decoration_theme_t::parse_theme_css(const std::string& css_file) const
     } else
     {
         theme_titlebar_fg_inactive = theme_titlebar_fg_active;
+    }
+
+    parse_titlebutton_colors(css_content);
+
+    /* Colour-coded buttons are designed for the titlebar the theme exports to
+     * window managers, which can differ from the window background: Colloid
+     * pairs a dark wm_bg with a white theme_bg_color, and its unfocused
+     * buttons are translucent white. */
+    if (!titlebutton_colors.empty())
+    {
+        auto use_wm_color = [&] (const char *name, wf::color_t& color)
+        {
+            if (color_vars.count(name))
+            {
+                color = parse_css_color(color_vars[name]);
+            }
+        };
+
+        use_wm_color("wm_bg", theme_titlebar_bg_active);
+        use_wm_color("wm_unfocused_bg", theme_titlebar_bg_inactive);
+        use_wm_color("wm_title", theme_titlebar_fg_active);
+        use_wm_color("wm_unfocused_title", theme_titlebar_fg_inactive);
     }
 
     // Set button colors - matching GTK style (visible circular backgrounds)
@@ -698,6 +872,7 @@ void decoration_theme_t::reload_theme() const
     LOGI("Reloading GTK theme and icons");
     invalidate_cache();
     clear_titlebutton_cache();
+    titlebutton_colors.clear();
     theme_loaded = false;
     icon_theme_name.clear();
     gtk_theme_name.clear();
@@ -1228,6 +1403,25 @@ cairo_surface_t*decoration_theme_t::get_button_surface(button_type_t button,
         bg_color = theme_button_active_bg;
     }
 
+    const bool hovered = state.hover_progress > 0;
+    const bool pressed = state.hover_progress < 0;
+    bool show_icon     = state.activated || hovered;
+
+    /* A theme that colours its buttons individually decides each state,
+     * including whether the glyph shows at all. */
+    wf::color_t themed_icon_color{};
+    const auto themed = titlebutton_colors.find(button);
+    if (themed != titlebutton_colors.end())
+    {
+        const auto& colors = themed->second;
+        bg_color = pressed ? colors.pressed_bg :
+            (state.activated ? colors.bg : colors.backdrop_bg);
+
+        themed_icon_color = !(hovered || pressed) ? colors.fg :
+            (state.activated ? colors.hover_fg : colors.backdrop_hover_fg);
+        show_icon = themed_icon_color.a > 0;
+    }
+
     // Draw circular button background - GTK style
     // Larger circle so there's visible padding between icon and circle edge
     double radius = (state.width / 2.0) - 2.5;
@@ -1236,7 +1430,7 @@ cairo_surface_t*decoration_theme_t::get_button_surface(button_type_t button,
     cairo_fill(cr);
 
     // Draw icon when window is active or when button is hovered (like native GTK)
-    if (state.activated || state.hover_progress > 0)
+    if (show_icon)
     {
         // Use theme text color for icon, with fallback
         wf::color_t icon_color = theme_titlebar_fg_active;
@@ -1256,6 +1450,11 @@ cairo_surface_t*decoration_theme_t::get_button_surface(button_type_t button,
         {
             // Default: semi-transparent
             icon_color.a = 0.7;
+        }
+
+        if (themed != titlebutton_colors.end())
+        {
+            icon_color = themed_icon_color;
         }
 
         // Try to load icon from theme
